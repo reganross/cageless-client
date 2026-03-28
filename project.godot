@@ -1,0 +1,17 @@
+; Engine configuration file.
+; Prefer editing in the Godot editor when possible.
+
+config_version=5
+
+[application]
+
+config/name="Cageless"
+config/description="Cageless MMORPG client"
+run/main_scene="res://scenes/main_menu.tscn"
+config/features=PackedStringArray("4.3", "Forward Plus")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"

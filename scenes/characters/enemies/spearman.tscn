@@ -1,0 +1,140 @@
+[gd_scene format=3 uid="uid://b8aiof6g66otb"]
+
+[ext_resource type="Script" uid="uid://duk4uaewalt33" path="res://scenes/characters/enemies/Spearman.cs" id="1_8o67v"]
+[ext_resource type="PackedScene" uid="uid://t4ch8q6v77wr" path="res://scenes/characters/weapons/spear.tscn" id="1_o7jor"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_8o67v"]
+top_radius = 0.0
+bottom_radius = 0.25
+height = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_6aj5b"]
+albedo_color = Color(1, 0, 0, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_hk1b3"]
+radius = 0.125
+height = 0.25
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_aajtg"]
+albedo_color = Color(0.5035302, 0.40813583, 0.13725168, 1)
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_0rnv7"]
+height = 1.0
+radius = 0.25
+
+[sub_resource type="Animation" id="Animation_8o67v"]
+resource_name = "Death"
+length = 0.5
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("../..:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.5),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(1.8325957, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("../..:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.5),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, -0.05, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_gpft5"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("../..:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0, 0, 0)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("../..:position")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0, 0, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_f5p1x"]
+resource_name = "Thrust"
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.4, 1),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0, 0.1), Vector3(0, 0, -0.3), Vector3(0, 0, 0)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_m7fen"]
+_data = {
+&"Death": SubResource("Animation_8o67v"),
+&"RESET": SubResource("Animation_gpft5"),
+&"Thrust": SubResource("Animation_f5p1x")
+}
+
+[node name="Spearman" type="CharacterBody3D" unique_id=1519874124 groups=["enemy"]]
+script = ExtResource("1_8o67v")
+
+[node name="Body" type="MeshInstance3D" parent="." unique_id=144687550]
+mesh = SubResource("CylinderMesh_8o67v")
+surface_material_override/0 = SubResource("StandardMaterial3D_6aj5b")
+
+[node name="Head" type="MeshInstance3D" parent="Body" unique_id=1613792297]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.375, 0)
+mesh = SubResource("SphereMesh_hk1b3")
+skeleton = NodePath("../..")
+surface_material_override/0 = SubResource("StandardMaterial3D_aajtg")
+
+[node name="WeaponSocket" type="Node3D" parent="Body" unique_id=1680242244]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0, 0)
+
+[node name="WeaponPivot" type="Node3D" parent="Body/WeaponSocket" unique_id=1282939084]
+
+[node name="Spear" parent="Body/WeaponSocket/WeaponPivot" unique_id=314096531 instance=ExtResource("1_o7jor")]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=2018289505]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0)
+shape = SubResource("CylinderShape3D_0rnv7")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1710982370]
+root_node = NodePath("../Body/WeaponSocket/WeaponPivot")
+libraries/ = SubResource("AnimationLibrary_m7fen")

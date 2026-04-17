@@ -1,0 +1,69 @@
+[gd_scene format=3 uid="uid://cnsl28s4a3h7t"]
+
+[ext_resource type="PackedScene" uid="uid://qnuyvl5oklob" path="res://scenes/characters/playercharacter.tscn" id="1_764e3"]
+[ext_resource type="PackedScene" uid="uid://t4ch8q6v77wr" path="res://scenes/characters/weapons/spear.tscn" id="2_aic3r"]
+[ext_resource type="PackedScene" uid="uid://ibaanlko577p" path="res://scenes/Environment/tree.tscn" id="2_qajva"]
+[ext_resource type="PackedScene" uid="uid://b8aiof6g66otb" path="res://scenes/characters/enemies/spearman.tscn" id="4_4l26h"]
+[ext_resource type="Script" path="res://scripts/combat/CombatWaveManager.cs" id="5_waves"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_qajva"]
+sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+
+[sub_resource type="Sky" id="Sky_aic3r"]
+sky_material = SubResource("ProceduralSkyMaterial_qajva")
+
+[sub_resource type="Environment" id="Environment_4l26h"]
+background_mode = 2
+sky = SubResource("Sky_aic3r")
+tonemap_mode = 2
+glow_enabled = true
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_c5dyq"]
+size = Vector3(100, 1, 100)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_764e3"]
+albedo_color = Color(0.52060413, 0.69766814, 0.42591366, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_qajva"]
+material = SubResource("StandardMaterial3D_764e3")
+size = Vector2(100, 100)
+
+[node name="Combat" type="Node3D" unique_id=332123753]
+script = ExtResource("5_waves")
+SpearmanScene = ExtResource("4_4l26h")
+
+[node name="EnemyWaves" type="Node3D" parent="." unique_id=332123754]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1756763997]
+environment = SubResource("Environment_4l26h")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1333351052]
+transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
+shadow_enabled = true
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=1568017896]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D" unique_id=448684639]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, -0.001)
+shape = SubResource("BoxShape3D_c5dyq")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D" unique_id=981429027]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00633049, -2.3841858e-07, -0.009349823)
+mesh = SubResource("PlaneMesh_qajva")
+
+[node name="Playercharacter" parent="." unique_id=91687606 instance=ExtResource("1_764e3")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0)
+WeaponScene = ExtResource("2_aic3r")
+
+[node name="Tree" parent="." unique_id=908589844 instance=ExtResource("2_qajva")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 1, 0)
+
+[node name="Tree2" parent="." unique_id=868420674 instance=ExtResource("2_qajva")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 5)
+
+[node name="Tree3" parent="." unique_id=71092836 instance=ExtResource("2_qajva")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -5)
+
+[node name="Tree4" parent="." unique_id=1183470453 instance=ExtResource("2_qajva")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5241194, 1, 2.2376356)

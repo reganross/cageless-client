@@ -1,0 +1,107 @@
+[gd_scene format=3 uid="uid://qnuyvl5oklob"]
+
+[ext_resource type="Script" uid="uid://3fdtgkvy8ncv" path="res://scenes/characters/Playercharacter.cs" id="1_gw74k"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_la5eu"]
+top_radius = 0.0
+bottom_radius = 0.25
+height = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gw74k"]
+albedo_color = Color(0, 0, 1, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_gpft5"]
+radius = 0.125
+height = 0.25
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_f5p1x"]
+albedo_color = Color(0.5035302, 0.40813583, 0.13725168, 1)
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_xftwd"]
+height = 1.0
+radius = 0.25
+
+[sub_resource type="Animation" id="Animation_gpft5"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0, 0, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_f5p1x"]
+resource_name = "Thrust"
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.4, 1),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0, 0.1), Vector3(0, 0, -0.3), Vector3(0, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Spear/Tip/Area3D:monitoring")
+tracks/1/interp = 0
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.4, 1),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 1,
+"values": [false, true, false]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_xftwd"]
+_data = {
+&"RESET": SubResource("Animation_gpft5"),
+&"Thrust": SubResource("Animation_f5p1x")
+}
+
+[node name="Playercharacter" type="CharacterBody3D" unique_id=91687606 groups=["player"]]
+script = ExtResource("1_gw74k")
+
+[node name="Body" type="MeshInstance3D" parent="." unique_id=118119226]
+mesh = SubResource("CylinderMesh_la5eu")
+surface_material_override/0 = SubResource("StandardMaterial3D_gw74k")
+
+[node name="Head" type="MeshInstance3D" parent="Body" unique_id=193997817]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.375, 0)
+mesh = SubResource("SphereMesh_gpft5")
+skeleton = NodePath("../..")
+surface_material_override/0 = SubResource("StandardMaterial3D_f5p1x")
+
+[node name="WeaponSocket" type="Node3D" parent="Body" unique_id=510956949]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0, 0)
+
+[node name="WeaponPivot" type="Node3D" parent="Body/WeaponSocket" unique_id=1348936708]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1405289917]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0)
+shape = SubResource("CylinderShape3D_xftwd")
+
+[node name="CameraPivot" type="Node3D" parent="." unique_id=1046771108]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+
+[node name="SpringArm3D" type="SpringArm3D" parent="CameraPivot" unique_id=1115008184]
+transform = Transform3D(1, 0, 0, 0, 0.89784324, 0.44031537, 0, -0.44031537, 0.89784324, 0, 0, 0)
+spring_length = 3.5
+
+[node name="Camera3D" type="Camera3D" parent="CameraPivot/SpringArm3D" unique_id=1578711760]
+transform = Transform3D(1, 0, 0, 0, 0.9999999, 2.0861626e-07, 0, -2.0861626e-07, 0.9999999, 0, 0, 0)
+fov = 51.7
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1933562971]
+root_node = NodePath("../Body/WeaponSocket/WeaponPivot")
+libraries/ = SubResource("AnimationLibrary_xftwd")

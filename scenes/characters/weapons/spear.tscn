@@ -1,0 +1,36 @@
+[gd_scene format=3 uid="uid://t4ch8q6v77wr"]
+
+[ext_resource type="Script" path="res://scenes/characters/weapons/SpearHitbox.cs" id="1_hitbox"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_1pcm5"]
+top_radius = 0.01
+bottom_radius = 0.01
+height = 0.66
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ucmo3"]
+albedo_color = Color(0.5035302, 0.40813583, 0.13725168, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_xvhpy"]
+top_radius = 0.0
+bottom_radius = 0.01
+height = 0.05
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1pcm5"]
+radius = 0.01
+height = 0.05
+
+[node name="Spear" type="MeshInstance3D" unique_id=314096531]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, -0.33254585)
+mesh = SubResource("CylinderMesh_1pcm5")
+surface_material_override/0 = SubResource("StandardMaterial3D_ucmo3")
+
+[node name="Tip" type="MeshInstance3D" parent="." unique_id=1403846949]
+transform = Transform3D(1, 0, 0, 0, -1, 8.742278e-08, 0, -8.742278e-08, -1, 0, -0.345, 0)
+mesh = SubResource("CylinderMesh_xvhpy")
+
+[node name="Area3D" type="Area3D" parent="Tip" unique_id=2017176434]
+monitoring = false
+script = ExtResource("1_hitbox")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Tip/Area3D" unique_id=1837354173]
+shape = SubResource("CapsuleShape3D_1pcm5")

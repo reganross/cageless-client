@@ -27,6 +27,7 @@ window/stretch/mode="canvas_items"
 
 [dotnet]
 
+; Godot builds Cageless.sln only — do not add Cageless.Tests there. Run tests: dotnet test tests/Cageless.Tests.sln
 project/assembly_name="Cageless"
 
 [global_group]

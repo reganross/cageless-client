@@ -1,0 +1,8 @@
+{
+  "files.exclude": {
+    "**/*.cs.uid": true
+  },
+  "search.exclude": {
+    "**/*.cs.uid": true
+  }
+}

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 public class SnapshotSystem
 {
     private readonly EntityRegistry registry;
@@ -16,13 +18,13 @@ public class SnapshotSystem
         var frame = new SnapshotFrame
         {
             Tick = tick,
-            States = new Dictionary<EntityId, EntityState>()
+            States = new Dictionary<int, EntityState>()
         };
 
         foreach (var kv in registry.All)
         {
             var entity = kv.Value;
-            frame.States[new EntityId(kv.Key)] = entity.CaptureState();
+            frame.States[kv.Key] = entity.CaptureState();
         }
 
         frames[index] = frame;

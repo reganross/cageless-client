@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 public class EntityRegistry
 {
     private int nextId = 1;

@@ -13,6 +13,36 @@ export_presets.cfg
 data_*/
 mono_crash.*.json
 
+# .NET / NuGet / MSBuild (game + tests)
+**/bin/
+**/obj/
+**/out/
+*.user
+*.userosscache
+*.rsuser
+*.suo
+*.cachefile
+project.lock.json
+
+# Build outputs (often appear outside bin/ if misconfigured)
+*.dll
+*.exe
+*.pdb
+*.deps.json
+*.runtimeconfig.json
+*.runtimeconfig.dev.json
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+*.DotSettings.user
+
+# Test & coverage
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
 # System / tooling
 .DS_Store
 Thumbs.db

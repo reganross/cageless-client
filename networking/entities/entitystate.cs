@@ -1,3 +1,5 @@
+using Godot;
+
 public struct EntityState
 {
     public Vector3 Position;

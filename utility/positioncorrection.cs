@@ -1,3 +1,5 @@
+using Godot;
+
 public static class PositionCorrection
 {
     public static Vector3 Apply(

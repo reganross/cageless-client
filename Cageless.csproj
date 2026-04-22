@@ -5,7 +5,7 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
 
-  <!-- xUnit project lives under tests/; do not compile it into the game assembly. -->
+  <!-- Tests live under tests/ (see tests/Cageless.Tests.sln). Never compile them into the game assembly. -->
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
   </ItemGroup>

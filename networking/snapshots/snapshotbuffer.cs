@@ -16,9 +16,14 @@ public class SnapshotBuffer<TSize>
         index = (index + 1) % frames.Length;
     }
 
-        public SnapshotFrame Get(int stepsBack)
+    public SnapshotFrame Get(int stepsBack)
     {
-        int i = (index - stepsBack + frames.Length) % frames.Length;
+        if (stepsBack < 0 || stepsBack >= frames.Length)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(stepsBack));
+        }
+
+        int i = (index - 1 - stepsBack + frames.Length) % frames.Length;
         return frames[i];
     }
 }

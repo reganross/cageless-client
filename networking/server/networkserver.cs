@@ -1,0 +1,259 @@
+using System.Collections.Generic;
+
+public class NetworkServer
+{
+    private readonly EntityRegistry registry = new();
+    private readonly SnapshotSystem snapshotSystem;
+    private readonly Dictionary<ClientId, Queue<SnapshotPacket>> outboundSnapshots = new();
+    private readonly Dictionary<ClientId, Queue<ClientCommandPacket>> inboundCommands = new();
+    private readonly Dictionary<ClientId, NetworkActivityState> clientActivityStates = new();
+    private readonly Dictionary<ClientId, double> clientAccumulatedSeconds = new();
+    private readonly Dictionary<ClientId, int> lastCommandSequences = new();
+    private readonly Dictionary<int, EntityState> lastSentStates = new();
+    private readonly IServerSnapshotTransport transport;
+    private readonly SnapshotDeltaPolicy deltaPolicy;
+    private readonly NetworkTickRatePolicy tickRatePolicy;
+    private readonly int fullSnapshotInterval;
+    private long nextSnapshotTick;
+    private int ticksSinceFullSnapshot;
+
+    public NetworkServer(int historySize)
+        : this(historySize, null, new SnapshotDeltaPolicy(), fullSnapshotInterval: 10)
+    {
+    }
+
+    public NetworkServer(int historySize, IServerSnapshotTransport transport)
+        : this(historySize, transport, new SnapshotDeltaPolicy(), fullSnapshotInterval: 10)
+    {
+    }
+
+    public NetworkServer(
+        int historySize,
+        IServerSnapshotTransport transport,
+        SnapshotDeltaPolicy deltaPolicy,
+        int fullSnapshotInterval)
+        : this(historySize, transport, deltaPolicy, fullSnapshotInterval, null)
+    {
+    }
+
+    public NetworkServer(
+        int historySize,
+        IServerSnapshotTransport transport,
+        SnapshotDeltaPolicy deltaPolicy,
+        int fullSnapshotInterval,
+        NetworkTickRatePolicy tickRatePolicy)
+    {
+        snapshotSystem = new SnapshotSystem(registry, historySize);
+        this.transport = transport;
+        this.deltaPolicy = deltaPolicy;
+        this.fullSnapshotInterval = fullSnapshotInterval;
+        this.tickRatePolicy = tickRatePolicy;
+    }
+
+    public EntityId RegisterEntity(INetworkEntity entity)
+    {
+        return registry.Create(entity);
+    }
+
+    public void DeregisterEntity(EntityId id)
+    {
+        registry.Remove(id);
+    }
+
+    public void ConnectClient(ClientId clientId)
+    {
+        if (!outboundSnapshots.ContainsKey(clientId))
+        {
+            outboundSnapshots[clientId] = new Queue<SnapshotPacket>();
+            inboundCommands[clientId] = new Queue<ClientCommandPacket>();
+        }
+    }
+
+    public void DisconnectClient(ClientId clientId)
+    {
+        outboundSnapshots.Remove(clientId);
+        inboundCommands.Remove(clientId);
+        clientActivityStates.Remove(clientId);
+        clientAccumulatedSeconds.Remove(clientId);
+        lastCommandSequences.Remove(clientId);
+    }
+
+    public void RecordSnapshot(long tick)
+    {
+        snapshotSystem.Capture(tick);
+    }
+
+    public SnapshotFrame GetLatestSnapshot()
+    {
+        return snapshotSystem.GetLatest();
+    }
+
+    public void Tick()
+    {
+        if (transport != null)
+        {
+            SyncConnectedClients(transport.ConnectedClients);
+        }
+
+        RecordSnapshot(nextSnapshotTick++);
+        QueueLatestSnapshot();
+
+        if (transport != null)
+        {
+            FlushSnapshots(transport);
+        }
+    }
+
+    public void Tick(double delta)
+    {
+        if (tickRatePolicy == null)
+        {
+            Tick();
+            return;
+        }
+
+        if (transport != null)
+        {
+            SyncConnectedClients(transport.ConnectedClients);
+        }
+
+        RecordSnapshot(nextSnapshotTick++);
+        var packet = CreateLatestSnapshotPacket();
+
+        foreach (var clientId in outboundSnapshots.Keys)
+        {
+            double accumulatedSeconds = clientAccumulatedSeconds.TryGetValue(clientId, out var current)
+                ? current + delta
+                : delta;
+            var interval = tickRatePolicy.GetInterval(GetClientActivityState(clientId));
+
+            while (accumulatedSeconds >= interval)
+            {
+                outboundSnapshots[clientId].Enqueue(packet);
+                accumulatedSeconds -= interval;
+            }
+
+            clientAccumulatedSeconds[clientId] = accumulatedSeconds;
+        }
+
+        if (transport != null)
+        {
+            FlushSnapshots(transport);
+        }
+    }
+
+    public void QueueLatestSnapshot()
+    {
+        var packet = CreateLatestSnapshotPacket();
+
+        foreach (var queue in outboundSnapshots.Values)
+        {
+            queue.Enqueue(packet);
+        }
+    }
+
+    public bool TryDequeueSnapshot(ClientId clientId, out SnapshotFrame snapshot)
+    {
+        if (TryDequeueSnapshotPacket(clientId, out var packet))
+        {
+            snapshot = packet.Frame;
+            return true;
+        }
+
+        snapshot = default;
+        return false;
+    }
+
+    public bool TryDequeueSnapshotPacket(ClientId clientId, out SnapshotPacket packet)
+    {
+        if (!outboundSnapshots.TryGetValue(clientId, out var queue) || queue.Count == 0)
+        {
+            packet = default;
+            return false;
+        }
+
+        packet = queue.Dequeue();
+        return true;
+    }
+
+    public void SyncConnectedClients(IReadOnlyCollection<ClientId> clientIds)
+    {
+        foreach (var clientId in clientIds)
+        {
+            ConnectClient(clientId);
+        }
+    }
+
+    public void SetClientActivityState(ClientId clientId, NetworkActivityState activityState)
+    {
+        clientActivityStates[clientId] = activityState;
+    }
+
+    public bool ReceiveCommand(ClientCommandPacket command)
+    {
+        if (!inboundCommands.TryGetValue(command.ClientId, out var queue))
+        {
+            return false;
+        }
+
+        if (lastCommandSequences.TryGetValue(command.ClientId, out var lastSequence)
+            && command.Sequence <= lastSequence)
+        {
+            return false;
+        }
+
+        queue.Enqueue(command);
+        lastCommandSequences[command.ClientId] = command.Sequence;
+        return true;
+    }
+
+    public bool TryDequeueCommand(ClientId clientId, out ClientCommandPacket command)
+    {
+        if (!inboundCommands.TryGetValue(clientId, out var queue) || queue.Count == 0)
+        {
+            command = default;
+            return false;
+        }
+
+        command = queue.Dequeue();
+        return true;
+    }
+
+    public void FlushSnapshots(IServerSnapshotTransport transport)
+    {
+        foreach (var clientId in transport.ConnectedClients)
+        {
+            while (TryDequeueSnapshotPacket(clientId, out var packet))
+            {
+                transport.SendSnapshot(clientId, packet);
+            }
+        }
+    }
+
+    private bool ShouldForceFullSnapshot()
+    {
+        return lastSentStates.Count == 0
+            || fullSnapshotInterval <= 1
+            || ticksSinceFullSnapshot >= fullSnapshotInterval - 1;
+    }
+
+    private SnapshotPacket CreateLatestSnapshotPacket()
+    {
+        var snapshot = snapshotSystem.GetLatest();
+        var forceFull = ShouldForceFullSnapshot();
+        var packet = deltaPolicy.CreatePacket(snapshot, lastSentStates, forceFull);
+
+        ticksSinceFullSnapshot = packet.Kind == SnapshotPacketKind.Full
+            ? 0
+            : ticksSinceFullSnapshot + 1;
+
+        return packet;
+    }
+
+    private NetworkActivityState GetClientActivityState(ClientId clientId)
+    {
+        return clientActivityStates.TryGetValue(clientId, out var activityState)
+            ? activityState
+            : NetworkActivityState.Exploring;
+    }
+}

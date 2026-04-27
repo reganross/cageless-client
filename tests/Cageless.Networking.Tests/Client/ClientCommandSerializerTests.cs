@@ -1,5 +1,4 @@
 using System.IO;
-using System.Linq;
 using Godot;
 using Xunit;
 
@@ -7,33 +6,40 @@ public class ClientCommandSerializerTests
 {
     /*
      PURPOSE:
-     Ensure movement intent commands serialize and deserialize correctly.
+     Ensure controller commands serialize and deserialize correctly.
 
      DESIGN RULE:
      - Clients send input intent, not authoritative transforms
-     - Movement command carries move direction and jump state
+     - Controller command carries the current input map state
 
      FAILURE MEANS:
      - Server may not reconstruct client input intent
      - Client packets may drift toward position authority
     */
     [Fact]
-    public void Serialize_ShouldRoundTripMovementCommand()
+    public void Serialize_ShouldRoundTripControllerCommand()
     {
         var packet = new ClientCommandPacket(
-            new ClientId(3),
-            sequence: 12,
-            ClientCommandKind.Movement,
-            new MovementCommand(new Vector2(1, -1), jumpPressed: true));
+            ClientCommandKind.Controller,
+            new PlayerController(
+                new ClientId(3),
+                sequence: 12,
+                new[]
+                {
+                    new InputActionState("right", 1),
+                    new InputActionState("forward", 1),
+                    new InputActionState("ui_accept", 1)
+                }));
 
         var bytes = ClientCommandSerializer.Serialize(packet);
         var deserialized = ClientCommandSerializer.Deserialize(bytes);
 
         Assert.Equal(new ClientId(3), deserialized.ClientId);
         Assert.Equal(12, deserialized.Sequence);
-        Assert.Equal(ClientCommandKind.Movement, deserialized.Kind);
-        Assert.Equal(new Vector2(1, -1), deserialized.Movement.MoveDirection);
-        Assert.True(deserialized.Movement.JumpPressed);
+        Assert.Equal(ClientCommandKind.Controller, deserialized.Kind);
+        Assert.Equal(1, deserialized.Controller.GetActionStrength("right"));
+        Assert.Equal(1, deserialized.Controller.GetActionStrength("forward"));
+        Assert.Equal(1, deserialized.Controller.GetActionStrength("ui_accept"));
     }
 
     /*
@@ -52,38 +58,20 @@ public class ClientCommandSerializerTests
     public void Serialize_ShouldPreserveClientIdAndSequence()
     {
         var packet = new ClientCommandPacket(
-            new ClientId(9),
-            sequence: 44,
-            ClientCommandKind.Movement,
-            new MovementCommand(Vector2.Zero, jumpPressed: false));
+            ClientCommandKind.Controller,
+            new PlayerController(
+                new ClientId(9),
+                sequence: 44,
+                new[]
+                {
+                    new InputActionState("forward", 1)
+                }));
 
         var deserialized = ClientCommandSerializer.Deserialize(
             ClientCommandSerializer.Serialize(packet));
 
         Assert.Equal(new ClientId(9), deserialized.ClientId);
         Assert.Equal(44, deserialized.Sequence);
-    }
-
-    /*
-     PURPOSE:
-     Ensure client commands do not carry authoritative position fields.
-
-     DESIGN RULE:
-     - Movement commands are player intent only
-     - Position remains server-authoritative
-
-     FAILURE MEANS:
-     - Clients may be able to submit authoritative transforms
-     - Cheating and desync become easier
-    */
-    [Fact]
-    public void MovementCommand_ShouldNotExposePositionFields()
-    {
-        var memberNames = typeof(MovementCommand)
-            .GetMembers()
-            .Select(member => member.Name);
-
-        Assert.DoesNotContain(memberNames, name => name.Contains("Position"));
     }
 
     /*

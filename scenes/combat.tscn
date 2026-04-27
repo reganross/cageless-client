@@ -31,6 +31,8 @@ size = Vector2(100, 100)
 
 [node name="Combat" type="Node3D" unique_id=332123753]
 script = ExtResource("5_waves")
+PlayerScene = ExtResource("1_764e3")
+PlayerWeaponScene = ExtResource("2_aic3r")
 SpearmanScene = ExtResource("4_4l26h")
 
 [node name="EnemyWaves" type="Node3D" parent="." unique_id=332123754]
@@ -51,10 +53,6 @@ shape = SubResource("BoxShape3D_c5dyq")
 [node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D" unique_id=981429027]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00633049, -2.3841858e-07, -0.009349823)
 mesh = SubResource("PlaneMesh_qajva")
-
-[node name="Playercharacter" parent="." unique_id=91687606 instance=ExtResource("1_764e3")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0)
-WeaponScene = ExtResource("2_aic3r")
 
 [node name="Tree" parent="." unique_id=908589844 instance=ExtResource("2_qajva")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 1, 0)

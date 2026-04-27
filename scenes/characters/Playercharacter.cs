@@ -24,6 +24,8 @@ public partial class Playercharacter : CharacterBody3D
 
 	private AnimationPlayer _animationPlayer;
 	private Node3D _cameraPivot;
+	private PlayerController _controller = new();
+	private bool _usesLocalInput = true;
 	private float _pitch;
 	/// <summary>Extra yaw on <see cref="_cameraPivot"/> so look direction can lead the body.</summary>
 	private float _yawOffset;
@@ -83,32 +85,41 @@ public partial class Playercharacter : CharacterBody3D
 
 			_pitch -= motion.Relative.Y * MouseSensitivity;
 			_pitch = Mathf.Clamp(_pitch, -1.2f, 1.2f);
-			_cameraPivot.Rotation = new Vector3(_pitch, _yawOffset, 0);
+			_controller.SetLookRotation(Rotation.Y + _yawOffset, _pitch);
+			_cameraPivot.Rotation = new Vector3(_controller.LookPitch, _yawOffset, 0);
 		}
+	}
+
+	public override void _Process(double delta)
+	{
+		if (_usesLocalInput)
+			UpdateControllerFromInputMap();
+	}
+
+	public PlayerController Controller => _controller;
+
+	public void UseController(PlayerController controller)
+	{
+		_controller = controller ?? throw new ArgumentNullException(nameof(controller));
+		_usesLocalInput = !controller.HasPlayerId;
+		_pitch = controller.LookPitch;
+		_yawOffset = Mathf.AngleDifference(Rotation.Y, controller.LookYaw);
 	}
 
 	public override void _PhysicsProcess(double delta)
 	{
 		float dt = (float)delta;
-		float maxYawRad = Mathf.DegToRad(MaxBodyYawDegreesPerSecond) * dt;
-		float absOffset = Mathf.Abs(_yawOffset);
-		if (absOffset > 0f)
-		{
-			float step = Mathf.Sign(_yawOffset) * Mathf.Min(absOffset, maxYawRad);
-			RotateY(step);
-			_yawOffset -= step;
-			_cameraPivot.Rotation = new Vector3(_pitch, _yawOffset, 0);
-		}
+		TurnTowardControllerLook(dt);
 
 		Vector3 velocity = Velocity;
 
 		if (!IsOnFloor())
 			velocity += GetGravity() * (float)delta;
 
-		if (Input.IsActionJustPressed("ui_accept") && IsOnFloor())
+		if (_controller.GetActionStrength("ui_accept") > 0f && IsOnFloor())
 			velocity.Y = JumpVelocity;
 
-		Vector2 inputDir = Input.GetVector("left", "right", "forward", "back");
+		Vector2 inputDir = _controller.GetMoveDirection();
 		Vector3 direction = (Transform.Basis * new Vector3(inputDir.X, 0, inputDir.Y)).Normalized();
 		if (direction != Vector3.Zero)
 		{
@@ -123,6 +134,31 @@ public partial class Playercharacter : CharacterBody3D
 
 		Velocity = velocity;
 		MoveAndSlide();
+	}
+
+	private void UpdateControllerFromInputMap()
+	{
+		_controller.SetActionStrength("left", Input.GetActionStrength("left"));
+		_controller.SetActionStrength("right", Input.GetActionStrength("right"));
+		_controller.SetActionStrength("forward", Input.GetActionStrength("forward"));
+		_controller.SetActionStrength("back", Input.GetActionStrength("back"));
+		_controller.SetActionStrength("ui_accept", Input.GetActionStrength("ui_accept"));
+		_controller.SetLookRotation(Rotation.Y + _yawOffset, _pitch);
+	}
+
+	private void TurnTowardControllerLook(float delta)
+	{
+		float yawDelta = Mathf.AngleDifference(Rotation.Y, _controller.LookYaw);
+		float maxYawRad = Mathf.DegToRad(MaxBodyYawDegreesPerSecond) * delta;
+		float step = Mathf.Clamp(yawDelta, -maxYawRad, maxYawRad);
+
+		if (Mathf.Abs(step) > 0f)
+		{
+			RotateY(step);
+		}
+
+		_yawOffset = Mathf.AngleDifference(Rotation.Y, _controller.LookYaw);
+		_cameraPivot.Rotation = new Vector3(_controller.LookPitch, _yawOffset, 0);
 	}
 
 	private bool TryPlaySpearThrust()

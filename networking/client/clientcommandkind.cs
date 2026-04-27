@@ -1,4 +1,4 @@
 public enum ClientCommandKind
 {
-    Movement = 1
+    Controller = 1
 }

@@ -4,6 +4,15 @@ using System;
 public partial class CombatWaveManager : Node3D
 {
 	[Export]
+	public PackedScene PlayerScene { get; set; }
+
+	[Export]
+	public PackedScene PlayerWeaponScene { get; set; }
+
+	[Export]
+	public Vector3 PlayerSpawnPosition { get; set; } = new(0, 0.25f, 0);
+
+	[Export]
 	public PackedScene SpearmanScene { get; set; }
 
 	/// <summary>Spearmen in wave 1.</summary>
@@ -27,6 +36,8 @@ public partial class CombatWaveManager : Node3D
 	public override void _Ready()
 	{
 		_enemyWaves = GetNode<Node3D>("EnemyWaves");
+		SpawnPlayer();
+
 		if (SpearmanScene == null)
 		{
 			GD.PushError($"{nameof(CombatWaveManager)}: SpearmanScene is not set.");
@@ -34,6 +45,20 @@ public partial class CombatWaveManager : Node3D
 		}
 
 		StartNextWave();
+	}
+
+	private void SpawnPlayer()
+	{
+		if (PlayerScene == null)
+		{
+			GD.PushError($"{nameof(CombatWaveManager)}: PlayerScene is not set.");
+			return;
+		}
+
+		var player = PlayerScene.Instantiate<Playercharacter>();
+		player.WeaponScene = PlayerWeaponScene;
+		AddChild(player);
+		player.GlobalPosition = PlayerSpawnPosition;
 	}
 
 	private void StartNextWave()

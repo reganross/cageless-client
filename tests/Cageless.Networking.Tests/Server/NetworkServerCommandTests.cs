@@ -1,11 +1,10 @@
-using Godot;
 using Xunit;
 
 public class NetworkServerCommandTests
 {
     /*
      PURPOSE:
-     Ensure valid client movement commands are queued for simulation.
+     Ensure valid client controller commands are queued for simulation.
 
      DESIGN RULE:
      - Server accepts commands only from connected clients
@@ -16,7 +15,7 @@ public class NetworkServerCommandTests
      - Networking may bypass the authoritative command queue
     */
     [Fact]
-    public void ReceiveCommand_ShouldQueueMovementCommandForConnectedClient()
+    public void ReceiveCommand_ShouldQueueControllerCommandForConnectedClient()
     {
         var server = new NetworkServer(historySize: 4);
         var clientId = new ClientId(1);
@@ -28,7 +27,7 @@ public class NetworkServerCommandTests
         Assert.True(accepted);
         Assert.True(server.TryDequeueCommand(clientId, out var dequeued));
         Assert.Equal(command.Sequence, dequeued.Sequence);
-        Assert.Equal(command.Movement.MoveDirection, dequeued.Movement.MoveDirection);
+        Assert.Equal(1, dequeued.Controller.GetActionStrength("forward"));
     }
 
     /*
@@ -52,13 +51,13 @@ public class NetworkServerCommandTests
 
         server.ConnectClient(firstClient);
         server.ConnectClient(secondClient);
-        server.ReceiveCommand(CreateCommand(firstClient, sequence: 1, moveDirection: Vector2.Right));
-        server.ReceiveCommand(CreateCommand(secondClient, sequence: 1, moveDirection: Vector2.Left));
+        server.ReceiveCommand(CreateCommand(firstClient, sequence: 1, actionName: "right"));
+        server.ReceiveCommand(CreateCommand(secondClient, sequence: 1, actionName: "left"));
 
         Assert.True(server.TryDequeueCommand(firstClient, out var firstCommand));
         Assert.True(server.TryDequeueCommand(secondClient, out var secondCommand));
-        Assert.Equal(Vector2.Right, firstCommand.Movement.MoveDirection);
-        Assert.Equal(Vector2.Left, secondCommand.Movement.MoveDirection);
+        Assert.Equal(1, firstCommand.Controller.GetActionStrength("right"));
+        Assert.Equal(1, secondCommand.Controller.GetActionStrength("left"));
     }
 
     /*
@@ -109,15 +108,45 @@ public class NetworkServerCommandTests
         Assert.False(server.ReceiveCommand(CreateCommand(clientId, sequence: 1)));
     }
 
+    /*
+     PURPOSE:
+     Ensure accepted commands update the server controller manager.
+
+     DESIGN RULE:
+     - Command packets update the managed controller for that player
+     - Stored controller state is available to authoritative simulation
+
+     FAILURE MEANS:
+     - Server simulation may read stale controller input
+     - Command queue and controller manager may diverge
+    */
+    [Fact]
+    public void ReceiveCommand_ShouldUpdateManagedController()
+    {
+        var server = new NetworkServer(historySize: 4);
+        var clientId = new ClientId(1);
+
+        server.ConnectClient(clientId);
+        var accepted = server.ReceiveCommand(CreateCommand(clientId, sequence: 1, actionName: "right"));
+
+        Assert.True(accepted);
+        Assert.True(server.Controllers.TryGet(clientId, out var controller));
+        Assert.Equal(1, controller.GetActionStrength("right"));
+    }
+
     private static ClientCommandPacket CreateCommand(
         ClientId clientId,
         int sequence,
-        Vector2? moveDirection = null)
+        string actionName = "forward")
     {
         return new ClientCommandPacket(
-            clientId,
-            sequence,
-            ClientCommandKind.Movement,
-            new MovementCommand(moveDirection ?? Vector2.Up, jumpPressed: false));
+            ClientCommandKind.Controller,
+            new PlayerController(
+                clientId,
+                sequence,
+                new[]
+                {
+                    new InputActionState(actionName, 1)
+                }));
     }
 }

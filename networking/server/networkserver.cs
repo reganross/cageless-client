@@ -17,6 +17,8 @@ public class NetworkServer
     private long nextSnapshotTick;
     private int ticksSinceFullSnapshot;
 
+    public PlayerControllerManager Controllers { get; } = new();
+
     public NetworkServer(int historySize)
         : this(historySize, null, new SnapshotDeltaPolicy(), fullSnapshotInterval: 10)
     {
@@ -66,6 +68,7 @@ public class NetworkServer
         {
             outboundSnapshots[clientId] = new Queue<SnapshotPacket>();
             inboundCommands[clientId] = new Queue<ClientCommandPacket>();
+            Controllers.GetOrCreate(clientId);
         }
     }
 
@@ -76,6 +79,7 @@ public class NetworkServer
         clientActivityStates.Remove(clientId);
         clientAccumulatedSeconds.Remove(clientId);
         lastCommandSequences.Remove(clientId);
+        Controllers.Remove(clientId);
     }
 
     public void RecordSnapshot(long tick)
@@ -203,6 +207,7 @@ public class NetworkServer
         }
 
         queue.Enqueue(command);
+        Controllers.Apply(command.Controller);
         lastCommandSequences[command.ClientId] = command.Sequence;
         return true;
     }

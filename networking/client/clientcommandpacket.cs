@@ -1,19 +1,15 @@
 public readonly struct ClientCommandPacket
 {
     public ClientCommandPacket(
-        ClientId clientId,
-        int sequence,
         ClientCommandKind kind,
-        MovementCommand movement)
+        PlayerController controller)
     {
-        ClientId = clientId;
-        Sequence = sequence;
         Kind = kind;
-        Movement = movement;
+        Controller = controller;
     }
 
-    public ClientId ClientId { get; }
-    public int Sequence { get; }
+    public ClientId ClientId => Controller.PlayerId;
+    public int Sequence => Controller.Sequence;
     public ClientCommandKind Kind { get; }
-    public MovementCommand Movement { get; }
+    public PlayerController Controller { get; }
 }

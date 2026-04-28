@@ -2,6 +2,8 @@ using System.Collections.Generic;
 
 public class NetworkServer
 {
+    public const int MaxClients = 4;
+
     private readonly EntityRegistry registry = new();
     private readonly SnapshotSystem snapshotSystem;
     private readonly Dictionary<ClientId, Queue<SnapshotPacket>> outboundSnapshots = new();
@@ -9,13 +11,14 @@ public class NetworkServer
     private readonly Dictionary<ClientId, NetworkActivityState> clientActivityStates = new();
     private readonly Dictionary<ClientId, double> clientAccumulatedSeconds = new();
     private readonly Dictionary<ClientId, int> lastCommandTicks = new();
-    private readonly Dictionary<int, EntityState> lastSentStates = new();
+    private readonly Dictionary<ClientId, Dictionary<int, EntityState>> lastSentStatesByClient = new();
     private readonly IServerSnapshotTransport transport;
     private readonly SnapshotDeltaPolicy deltaPolicy;
     private readonly NetworkTickRatePolicy tickRatePolicy;
     private readonly int fullSnapshotInterval;
     private long nextSnapshotTick;
     private int ticksSinceFullSnapshot;
+    private bool hasRecordedSnapshot;
 
     public PlayerControllerManager Controllers { get; } = new();
 
@@ -62,14 +65,29 @@ public class NetworkServer
         registry.Remove(id);
     }
 
-    public void ConnectClient(ClientId clientId)
+    public bool ConnectClient(ClientId clientId)
     {
-        if (!outboundSnapshots.ContainsKey(clientId))
+        if (outboundSnapshots.ContainsKey(clientId))
         {
-            outboundSnapshots[clientId] = new Queue<SnapshotPacket>();
-            inboundCommands[clientId] = new Queue<ClientCommandPacket>();
-            Controllers.GetOrCreate(clientId);
+            return true;
         }
+
+        if (outboundSnapshots.Count >= MaxClients)
+        {
+            return false;
+        }
+
+        outboundSnapshots[clientId] = new Queue<SnapshotPacket>();
+        inboundCommands[clientId] = new Queue<ClientCommandPacket>();
+        lastSentStatesByClient[clientId] = new Dictionary<int, EntityState>();
+        Controllers.GetOrCreate(clientId);
+
+        if (hasRecordedSnapshot)
+        {
+            QueueSnapshotForClient(clientId, forceFull: true);
+        }
+
+        return true;
     }
 
     public void DisconnectClient(ClientId clientId)
@@ -79,12 +97,14 @@ public class NetworkServer
         clientActivityStates.Remove(clientId);
         clientAccumulatedSeconds.Remove(clientId);
         lastCommandTicks.Remove(clientId);
+        lastSentStatesByClient.Remove(clientId);
         Controllers.Remove(clientId);
     }
 
     public void RecordSnapshot(long tick)
     {
         snapshotSystem.Capture(tick);
+        hasRecordedSnapshot = true;
     }
 
     public SnapshotFrame GetLatestSnapshot()
@@ -122,7 +142,9 @@ public class NetworkServer
         }
 
         RecordSnapshot(nextSnapshotTick++);
-        var packet = CreateLatestSnapshotPacket();
+        var forceFull = ShouldForceFullSnapshot();
+        bool queuedFull = false;
+        bool queuedAny = false;
 
         foreach (var clientId in outboundSnapshots.Keys)
         {
@@ -133,7 +155,9 @@ public class NetworkServer
 
             while (accumulatedSeconds >= interval)
             {
-                outboundSnapshots[clientId].Enqueue(packet);
+                var packet = QueueSnapshotForClient(clientId, forceFull);
+                queuedAny = true;
+                queuedFull = queuedFull || packet.Kind == SnapshotPacketKind.Full;
                 accumulatedSeconds -= interval;
             }
 
@@ -144,15 +168,29 @@ public class NetworkServer
         {
             FlushSnapshots(transport);
         }
+
+        if (queuedAny)
+        {
+            AdvanceFullSnapshotCounter(queuedFull);
+        }
     }
 
     public void QueueLatestSnapshot()
     {
-        var packet = CreateLatestSnapshotPacket();
+        var forceFull = ShouldForceFullSnapshot();
+        bool queuedFull = false;
+        bool queuedAny = false;
 
-        foreach (var queue in outboundSnapshots.Values)
+        foreach (var clientId in outboundSnapshots.Keys)
         {
-            queue.Enqueue(packet);
+            var packet = QueueSnapshotForClient(clientId, forceFull);
+            queuedAny = true;
+            queuedFull = queuedFull || packet.Kind == SnapshotPacketKind.Full;
+        }
+
+        if (queuedAny)
+        {
+            AdvanceFullSnapshotCounter(queuedFull);
         }
     }
 
@@ -237,22 +275,32 @@ public class NetworkServer
 
     private bool ShouldForceFullSnapshot()
     {
-        return lastSentStates.Count == 0
-            || fullSnapshotInterval <= 1
+        return fullSnapshotInterval <= 1
             || ticksSinceFullSnapshot >= fullSnapshotInterval - 1;
     }
 
-    private SnapshotPacket CreateLatestSnapshotPacket()
+    private SnapshotPacket QueueSnapshotForClient(ClientId clientId, bool forceFull)
     {
-        var snapshot = snapshotSystem.GetLatest();
-        var forceFull = ShouldForceFullSnapshot();
-        var packet = deltaPolicy.CreatePacket(snapshot, lastSentStates, forceFull);
+        if (!outboundSnapshots.TryGetValue(clientId, out var queue))
+        {
+            return default;
+        }
 
-        ticksSinceFullSnapshot = packet.Kind == SnapshotPacketKind.Full
+        var snapshot = snapshotSystem.GetLatest();
+        var packet = deltaPolicy.CreatePacket(
+            snapshot,
+            lastSentStatesByClient[clientId],
+            forceFull || lastSentStatesByClient[clientId].Count == 0);
+
+        queue.Enqueue(packet);
+        return packet;
+    }
+
+    private void AdvanceFullSnapshotCounter(bool forceFull)
+    {
+        ticksSinceFullSnapshot = forceFull
             ? 0
             : ticksSinceFullSnapshot + 1;
-
-        return packet;
     }
 
     private NetworkActivityState GetClientActivityState(ClientId clientId)

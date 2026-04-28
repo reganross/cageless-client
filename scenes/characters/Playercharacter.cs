@@ -102,8 +102,13 @@ public partial class Playercharacter : CharacterBody3D
 
 	public void UseController(PlayerController controller)
 	{
+		UseController(controller, usesLocalInput: !controller.HasPlayerId);
+	}
+
+	public void UseController(PlayerController controller, bool usesLocalInput)
+	{
 		_controller = controller ?? throw new ArgumentNullException(nameof(controller));
-		_usesLocalInput = !controller.HasPlayerId;
+		_usesLocalInput = usesLocalInput;
 		_pitch = controller.LookPitch;
 		_yawOffset = Mathf.AngleDifference(Rotation.Y, controller.LookYaw);
 	}

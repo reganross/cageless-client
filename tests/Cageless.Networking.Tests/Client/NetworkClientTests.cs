@@ -129,6 +129,36 @@ public class NetworkClientTests
 
     /*
      PURPOSE:
+     Ensure externally owned clocks are not reset by client connection lifecycle.
+
+     DESIGN RULE:
+     - A shared scene-level clock can outlive one client object
+     - NetworkClient consumes future ticks without rewinding shared time
+
+     FAILURE MEANS:
+     - A client connect/disconnect could desync other systems using the same tick driver
+     - Server and client code could disagree on the current network tick
+    */
+    [Fact]
+    public void Connect_ShouldNotResetExternallyOwnedClock()
+    {
+        var transport = new FakeClientTransport();
+        var clock = new NetworkTickClock();
+        var advancer = clock.CreateAdvancer();
+        advancer.Advance(0.15);
+        var client = new NetworkClient(transport, clock);
+
+        client.Connect(new ClientId(5));
+        client.Controller.SetActionStrength("forward", 1);
+        advancer.Advance(0.05);
+
+        Assert.Equal(4, clock.CurrentTick);
+        Assert.Equal(1, client.ProcessPendingTicks());
+        Assert.Equal(4, ReadCommand(transport.Sent[1]).Tick);
+    }
+
+    /*
+     PURPOSE:
      Ensure unchanged controller state is not sent every tick.
 
      DESIGN RULE:

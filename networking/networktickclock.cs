@@ -32,6 +32,11 @@ public class NetworkTickClock
         return new Advancer(this);
     }
 
+    public TickCursor CreateCursor()
+    {
+        return new TickCursor(this);
+    }
+
     public bool TryRequestTick(out int tick)
     {
         if (PendingTicks == 0)
@@ -115,6 +120,36 @@ public class NetworkTickClock
             {
                 throw new ObjectDisposedException(nameof(Advancer));
             }
+        }
+    }
+
+    public sealed class TickCursor
+    {
+        private readonly NetworkTickClock clock;
+        private int lastRequestedTick;
+
+        internal TickCursor(NetworkTickClock clock)
+        {
+            this.clock = clock;
+            lastRequestedTick = clock.CurrentTick;
+        }
+
+        public bool TryRequestTick(out int tick)
+        {
+            if (lastRequestedTick >= clock.CurrentTick)
+            {
+                tick = 0;
+                return false;
+            }
+
+            lastRequestedTick++;
+            tick = lastRequestedTick;
+            return true;
+        }
+
+        public void ResetToCurrent()
+        {
+            lastRequestedTick = clock.CurrentTick;
         }
     }
 }

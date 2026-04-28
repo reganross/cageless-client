@@ -142,6 +142,113 @@ public class NetworkServerTests
 
     /*
      PURPOSE:
+     Ensure the server caps accepted client connections.
+
+     DESIGN RULE:
+     - Server accepts at most four connected clients
+     - Additional unique client ids are rejected predictably
+
+     FAILURE MEANS:
+     - Too many clients may join one server session
+     - Server bandwidth and simulation cost may exceed design limits
+    */
+    [Fact]
+    public void ConnectClient_ShouldRejectFifthUniqueClient()
+    {
+        var server = new NetworkServer(historySize: 4);
+
+        Assert.True(server.ConnectClient(new ClientId(1)));
+        Assert.True(server.ConnectClient(new ClientId(2)));
+        Assert.True(server.ConnectClient(new ClientId(3)));
+        Assert.True(server.ConnectClient(new ClientId(4)));
+        Assert.False(server.ConnectClient(new ClientId(5)));
+    }
+
+    /*
+     PURPOSE:
+     Ensure duplicate connection attempts do not consume new slots.
+
+     DESIGN RULE:
+     - Client ids are unique connection identities
+     - Reconnecting the same id is idempotent
+
+     FAILURE MEANS:
+     - Duplicate UDP connect packets may fill the server
+     - One client may create multiple queues/controllers
+    */
+    [Fact]
+    public void ConnectClient_ShouldAcceptDuplicateWithoutConsumingSlot()
+    {
+        var server = new NetworkServer(historySize: 4);
+        var clientId = new ClientId(1);
+
+        Assert.True(server.ConnectClient(clientId));
+        Assert.True(server.ConnectClient(clientId));
+        Assert.True(server.ConnectClient(new ClientId(2)));
+        Assert.True(server.ConnectClient(new ClientId(3)));
+        Assert.True(server.ConnectClient(new ClientId(4)));
+        Assert.False(server.ConnectClient(new ClientId(5)));
+    }
+
+    /*
+     PURPOSE:
+     Ensure disconnecting a client frees its connection slot.
+
+     DESIGN RULE:
+     - Disconnected clients are removed from server connection state
+     - New clients can join after a disconnect
+
+     FAILURE MEANS:
+     - Empty slots may remain permanently occupied
+     - Servers may stop accepting clients after churn
+    */
+    [Fact]
+    public void DisconnectClient_ShouldFreeConnectionSlot()
+    {
+        var server = new NetworkServer(historySize: 4);
+
+        server.ConnectClient(new ClientId(1));
+        server.ConnectClient(new ClientId(2));
+        server.ConnectClient(new ClientId(3));
+        server.ConnectClient(new ClientId(4));
+        server.DisconnectClient(new ClientId(4));
+
+        Assert.True(server.ConnectClient(new ClientId(5)));
+    }
+
+    /*
+     PURPOSE:
+     Ensure newly connected clients receive a complete baseline.
+
+     DESIGN RULE:
+     - First snapshot sent to a client is full
+     - Per-client baselines are established on connection
+
+     FAILURE MEANS:
+     - Clients may receive deltas before they have world state
+     - Entity reconstruction may fail immediately after connect
+    */
+    [Fact]
+    public void ConnectClient_ShouldQueueFullSnapshotWhenSnapshotExists()
+    {
+        var server = new NetworkServer(historySize: 4);
+        server.RegisterEntity(new TestNetworkEntity(new EntityState
+        {
+            Position = Vector3.Zero,
+            Rotation = Quaternion.Identity
+        }));
+        server.RecordSnapshot(tick: 42);
+
+        Assert.True(server.ConnectClient(new ClientId(1)));
+
+        Assert.True(server.TryDequeueSnapshotPacket(new ClientId(1), out var packet));
+        Assert.Equal(SnapshotPacketKind.Full, packet.Kind);
+        Assert.Equal(42, packet.Frame.Tick);
+        Assert.Single(packet.Frame.States);
+    }
+
+    /*
+     PURPOSE:
      Ensure the persistent server can advance one authoritative network tick.
 
      DESIGN RULE:
@@ -243,6 +350,49 @@ public class NetworkServerTests
 
         Assert.Equal(SnapshotPacketKind.Delta, transport.SentSnapshots[1].Packet.Kind);
         Assert.Empty(transport.SentSnapshots[1].Snapshot.States);
+    }
+
+    /*
+     PURPOSE:
+     Ensure delta baselines are tracked separately for each client.
+
+     DESIGN RULE:
+     - One client's prior sends do not establish another client's baseline
+     - Newly connected clients receive full state even after existing clients receive deltas
+
+     FAILURE MEANS:
+     - Late-joining clients may receive empty deltas as their first update
+     - Per-client world reconstruction may start without a baseline
+    */
+    [Fact]
+    public void ConnectClient_ShouldUseIndependentSnapshotBaselinePerClient()
+    {
+        var firstClient = new ClientId(1);
+        var secondClient = new ClientId(2);
+        var server = new NetworkServer(historySize: 4);
+        server.RegisterEntity(new TestNetworkEntity(new EntityState
+        {
+            Position = Vector3.Zero,
+            Rotation = Quaternion.Identity
+        }));
+
+        server.ConnectClient(firstClient);
+        server.RecordSnapshot(tick: 1);
+        server.QueueLatestSnapshot();
+        Assert.True(server.TryDequeueSnapshotPacket(firstClient, out var firstPacket));
+        Assert.Equal(SnapshotPacketKind.Full, firstPacket.Kind);
+
+        server.RecordSnapshot(tick: 2);
+        server.QueueLatestSnapshot();
+        Assert.True(server.TryDequeueSnapshotPacket(firstClient, out var firstDelta));
+        Assert.Equal(SnapshotPacketKind.Delta, firstDelta.Kind);
+        Assert.Empty(firstDelta.Frame.States);
+
+        server.ConnectClient(secondClient);
+
+        Assert.True(server.TryDequeueSnapshotPacket(secondClient, out var secondPacket));
+        Assert.Equal(SnapshotPacketKind.Full, secondPacket.Kind);
+        Assert.Single(secondPacket.Frame.States);
     }
 
     /*

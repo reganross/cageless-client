@@ -1,16 +1,19 @@
 using System.Collections.Generic;
 using System.IO;
 
-public class NetworkClient
+public class NetworkClient : System.IDisposable
 {
     private const int FullControllerIntervalTicks = 5;
 
     private readonly IClientTransport transport;
     private readonly NetworkTickClock tickClock;
+    private readonly bool ownsClockAdvancement;
     private readonly NetworkTickClock.Advancer ownedAdvancer;
+    private readonly NetworkTickClock.TickCursor tickCursor;
     private SnapshotPacket latestSnapshot;
     private bool hasLatestSnapshot;
     private PlayerController lastSentController;
+    private bool disposed;
 
     public NetworkClient(IClientTransport transport)
         : this(transport, new NetworkTickClock(), ownsClockAdvancement: true)
@@ -29,6 +32,8 @@ public class NetworkClient
     {
         this.transport = transport;
         this.tickClock = tickClock ?? throw new System.ArgumentNullException(nameof(tickClock));
+        this.ownsClockAdvancement = ownsClockAdvancement;
+        tickCursor = tickClock.CreateCursor();
         ownedAdvancer = ownsClockAdvancement
             ? tickClock.CreateAdvancer()
             : null;
@@ -50,7 +55,12 @@ public class NetworkClient
         ClientId = clientId;
         Controller = new PlayerController(clientId, tick: 0);
         lastSentController = CopyController(Controller, tick: 0);
-        tickClock.Reset();
+        if (ownsClockAdvancement)
+        {
+            tickClock.Reset();
+        }
+
+        tickCursor.ResetToCurrent();
         IsConnected = true;
 
         transport.Send(CreateClientIdPacket(ClientPacketKind.Connect, clientId));
@@ -86,7 +96,7 @@ public class NetworkClient
         }
 
         int sent = 0;
-        while (tickClock.TryRequestTick(out int tick))
+        while (tickCursor.TryRequestTick(out int tick))
         {
             Controller.SetTick(tick);
 
@@ -101,6 +111,8 @@ public class NetworkClient
 
     public int ReceiveSnapshots()
     {
+        ThrowIfDisposed();
+
         int received = 0;
 
         while (transport.TryReceive(out var bytes))
@@ -127,6 +139,8 @@ public class NetworkClient
 
     public bool Disconnect()
     {
+        ThrowIfDisposed();
+
         if (!IsConnected)
         {
             return false;
@@ -136,8 +150,30 @@ public class NetworkClient
         IsConnected = false;
         Controller = new PlayerController();
         lastSentController = null;
-        tickClock.Reset();
+        if (ownsClockAdvancement)
+        {
+            tickClock.Reset();
+        }
+
+        tickCursor.ResetToCurrent();
         return true;
+    }
+
+    public void Dispose()
+    {
+        if (disposed)
+        {
+            return;
+        }
+
+        if (IsConnected)
+        {
+            Disconnect();
+        }
+
+        disposed = true;
+        ownedAdvancer?.Dispose();
+        transport.Dispose();
     }
 
     private bool ProcessControllerTick(int tick)
@@ -183,8 +219,18 @@ public class NetworkClient
 
     private void SendControllerCommand(ClientCommandPacket command)
     {
+        ThrowIfDisposed();
+
         var payload = ClientCommandSerializer.Serialize(command);
         transport.Send(CreatePayloadPacket(ClientPacketKind.Controller, payload));
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (disposed)
+        {
+            throw new System.ObjectDisposedException(nameof(NetworkClient));
+        }
     }
 
     private static byte[] CreateClientIdPacket(ClientPacketKind kind, ClientId clientId)

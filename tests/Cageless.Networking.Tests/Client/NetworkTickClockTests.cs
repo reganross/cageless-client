@@ -135,6 +135,42 @@ public class NetworkTickClockTests
 
     /*
      PURPOSE:
+     Ensure multiple systems can observe the same externally advanced clock.
+
+     DESIGN RULE:
+     - Tick cursors track consumption independently per system
+     - One consumer cannot drain ticks before another system sees them
+
+     FAILURE MEANS:
+     - Client and server cannot share one scene-level network tick driver
+     - Processing order may decide which systems receive ticks
+    */
+    [Fact]
+    public void TickCursor_ShouldAllowIndependentConsumers()
+    {
+        var clock = new NetworkTickClock(tickIntervalSeconds: 0.05);
+        var firstConsumer = clock.CreateCursor();
+        var secondConsumer = clock.CreateCursor();
+        var advancer = clock.CreateAdvancer();
+
+        advancer.Advance(0.1);
+
+        Assert.True(firstConsumer.TryRequestTick(out var firstTick));
+        Assert.True(firstConsumer.TryRequestTick(out var secondTick));
+        Assert.False(firstConsumer.TryRequestTick(out _));
+
+        Assert.True(secondConsumer.TryRequestTick(out var mirroredFirstTick));
+        Assert.True(secondConsumer.TryRequestTick(out var mirroredSecondTick));
+        Assert.False(secondConsumer.TryRequestTick(out _));
+
+        Assert.Equal(1, firstTick);
+        Assert.Equal(2, secondTick);
+        Assert.Equal(1, mirroredFirstTick);
+        Assert.Equal(2, mirroredSecondTick);
+    }
+
+    /*
+     PURPOSE:
      Ensure only one object can own clock advancement.
 
      DESIGN RULE:

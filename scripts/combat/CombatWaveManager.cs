@@ -32,11 +32,13 @@ public partial class CombatWaveManager : Node3D
 	private int _waveIndex;
 	private int _remainingInWave;
 	private Node3D _enemyWaves;
-	private NetworkTickClock.Advancer _localPlayerTickClockAdvancer;
 
 	public override void _Ready()
 	{
 		_enemyWaves = GetNode<Node3D>("EnemyWaves");
+		if (NetworkSession.TickClock == null)
+			NetworkSession.StartSinglePlayer();
+
 		SpawnPlayer();
 
 		if (SpearmanScene == null)
@@ -58,17 +60,24 @@ public partial class CombatWaveManager : Node3D
 
 		var player = PlayerScene.Instantiate<Playercharacter>();
 		player.WeaponScene = PlayerWeaponScene;
-		var tickClock = new NetworkTickClock();
-		_localPlayerTickClockAdvancer = tickClock.CreateAdvancer();
-		player.UseTickClockAdvancer(_localPlayerTickClockAdvancer);
+		player.UseTickClockAdvancer(NetworkSession.TickClockAdvancer);
+
+		if (NetworkSession.Client != null)
+			player.UseController(NetworkSession.Client.Controller, usesLocalInput: true);
+
 		AddChild(player);
 		player.GlobalPosition = PlayerSpawnPosition;
 	}
 
+	public override void _PhysicsProcess(double delta)
+	{
+		NetworkSession.Tick(delta);
+	}
+
 	public override void _ExitTree()
 	{
-		_localPlayerTickClockAdvancer?.Dispose();
-		_localPlayerTickClockAdvancer = null;
+		if (NetworkSession.Mode == NetworkSessionMode.SinglePlayer)
+			NetworkSession.Reset();
 	}
 
 	private void StartNextWave()

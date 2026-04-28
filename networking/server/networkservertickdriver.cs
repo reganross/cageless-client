@@ -1,7 +1,10 @@
-public class NetworkServerTickDriver
+using System;
+
+public class NetworkServerTickDriver : IDisposable
 {
     private readonly NetworkServer server;
     private readonly NetworkTickClock tickClock;
+    private readonly NetworkTickClock.TickCursor tickCursor;
     private readonly NetworkTickClock.Advancer ownedAdvancer;
 
     public NetworkServerTickDriver(
@@ -25,6 +28,7 @@ public class NetworkServerTickDriver
     {
         this.server = server;
         this.tickClock = tickClock;
+        tickCursor = tickClock.CreateCursor();
         ownedAdvancer = ownsClockAdvancement
             ? tickClock.CreateAdvancer()
             : null;
@@ -32,24 +36,28 @@ public class NetworkServerTickDriver
 
     public void Tick(double delta)
     {
-        if (ownedAdvancer == null)
+        if (ownedAdvancer != null)
         {
-            return;
+            ownedAdvancer.Advance(delta);
         }
 
-        ownedAdvancer.Advance(delta);
         ProcessPendingTicks();
     }
 
     public int ProcessPendingTicks()
     {
         int processed = 0;
-        while (tickClock.TryRequestTick(out _))
+        while (tickCursor.TryRequestTick(out _))
         {
             server.Tick();
             processed++;
         }
 
         return processed;
+    }
+
+    public void Dispose()
+    {
+        ownedAdvancer?.Dispose();
     }
 }

@@ -54,7 +54,9 @@ public class SnapshotDeltaPolicy
 
     private bool HasMeaningfulChange(EntityState previous, EntityState current)
     {
-        return previous.StateFlags != current.StateFlags
+        return previous.TypeId != current.TypeId
+            || previous.OwnerId != current.OwnerId
+            || previous.StateFlags != current.StateFlags
             || previous.Position.DistanceTo(current.Position) > PositionThreshold
             || previous.Velocity.DistanceTo(current.Velocity) > VelocityThreshold
             || QuaternionDistance(previous.Rotation, current.Rotation) > RotationThreshold;

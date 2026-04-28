@@ -12,11 +12,13 @@ public class NetworkServer
     private readonly Dictionary<ClientId, double> clientAccumulatedSeconds = new();
     private readonly Dictionary<ClientId, int> lastCommandTicks = new();
     private readonly Dictionary<ClientId, Dictionary<int, EntityState>> lastSentStatesByClient = new();
+    private readonly Dictionary<ClientId, ServerPlayerEntity> playerEntitiesByClient = new();
     private readonly IServerSnapshotTransport transport;
     private readonly SnapshotDeltaPolicy deltaPolicy;
     private readonly NetworkTickRatePolicy tickRatePolicy;
     private readonly int fullSnapshotInterval;
     private long nextSnapshotTick;
+    private long lastRecordedSnapshotTick;
     private int ticksSinceFullSnapshot;
     private bool hasRecordedSnapshot;
 
@@ -81,9 +83,11 @@ public class NetworkServer
         inboundCommands[clientId] = new Queue<ClientCommandPacket>();
         lastSentStatesByClient[clientId] = new Dictionary<int, EntityState>();
         Controllers.GetOrCreate(clientId);
+        CreatePlayerEntity(clientId);
 
         if (hasRecordedSnapshot)
         {
+            RecordSnapshot(lastRecordedSnapshotTick);
             QueueSnapshotForClient(clientId, forceFull: true);
         }
 
@@ -99,11 +103,14 @@ public class NetworkServer
         lastCommandTicks.Remove(clientId);
         lastSentStatesByClient.Remove(clientId);
         Controllers.Remove(clientId);
+        RemovePlayerEntity(clientId);
     }
 
     public void RecordSnapshot(long tick)
     {
+        SimulateAuthoritativePlayers();
         snapshotSystem.Capture(tick);
+        lastRecordedSnapshotTick = tick;
         hasRecordedSnapshot = true;
     }
 
@@ -308,5 +315,38 @@ public class NetworkServer
         return clientActivityStates.TryGetValue(clientId, out var activityState)
             ? activityState
             : NetworkActivityState.Exploring;
+    }
+
+    private void CreatePlayerEntity(ClientId clientId)
+    {
+        if (playerEntitiesByClient.ContainsKey(clientId))
+        {
+            return;
+        }
+
+        var playerEntity = new ServerPlayerEntity(clientId);
+        var entityId = RegisterEntity(playerEntity);
+        playerEntity.AssignEntityId(entityId);
+        playerEntitiesByClient[clientId] = playerEntity;
+    }
+
+    private void RemovePlayerEntity(ClientId clientId)
+    {
+        if (!playerEntitiesByClient.TryGetValue(clientId, out var playerEntity))
+        {
+            return;
+        }
+
+        DeregisterEntity(playerEntity.Id);
+        playerEntitiesByClient.Remove(clientId);
+    }
+
+    private void SimulateAuthoritativePlayers()
+    {
+        foreach (var kv in playerEntitiesByClient)
+        {
+            Controllers.TryGet(kv.Key, out var controller);
+            kv.Value.Simulate(controller);
+        }
     }
 }

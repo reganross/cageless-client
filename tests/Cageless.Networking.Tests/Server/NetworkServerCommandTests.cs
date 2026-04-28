@@ -173,6 +173,35 @@ public class NetworkServerCommandTests
         Assert.Equal(1, controller.GetActionStrength("right"));
     }
 
+    /*
+     PURPOSE:
+     Ensure managed controllers drive authoritative server player entities.
+
+     DESIGN RULE:
+     - Accepted controller input is used by server-side player simulation
+     - Captured snapshots reflect movement from the authoritative player entity
+
+     FAILURE MEANS:
+     - Server may receive input without moving the joined player
+     - Clients may replicate a player that never responds to commands
+    */
+    [Fact]
+    public void RecordSnapshot_ShouldSimulatePlayerEntityFromController()
+    {
+        var server = new NetworkServer(historySize: 4);
+        var clientId = new ClientId(1);
+
+        server.ConnectClient(clientId);
+        Assert.True(server.ReceiveCommand(CreateCommand(clientId, tick: 1, actionName: "forward")));
+        server.RecordSnapshot(tick: 1);
+
+        var state = Assert.Single(server.GetLatestSnapshot().States).Value;
+        Assert.Equal((int)NetworkEntityType.Player, state.TypeId);
+        Assert.Equal(clientId.Value, state.OwnerId);
+        Assert.NotEqual(Godot.Vector3.Zero, state.Velocity);
+        Assert.NotEqual(Godot.Vector3.Zero, state.Position);
+    }
+
     private static ClientCommandPacket CreateCommand(
         ClientId clientId,
         int tick,

@@ -39,7 +39,7 @@ public class SnapshotSerializerTests
 
      DESIGN RULE:
      - Entity id is written before its state
-     - Position, rotation, velocity, and flags are included
+     - Type, owner, position, rotation, velocity, and flags are included
 
      FAILURE MEANS:
      - Clients cannot reconstruct authoritative entity state
@@ -55,6 +55,8 @@ public class SnapshotSerializerTests
             {
                 [7] = new EntityState
                 {
+                    TypeId = (int)NetworkEntityType.Player,
+                    OwnerId = 3,
                     Position = new Vector3(1, 2, 3),
                     Rotation = new Quaternion(4, 5, 6, 7),
                     Velocity = new Vector3(8, 9, 10),
@@ -69,6 +71,8 @@ public class SnapshotSerializerTests
         Assert.Equal(42, reader.ReadInt64());
         Assert.Equal(1, reader.ReadInt32());
         Assert.Equal(7, reader.ReadInt32());
+        Assert.Equal((int)NetworkEntityType.Player, reader.ReadInt32());
+        Assert.Equal(3, reader.ReadInt32());
         Assert.Equal(1, reader.ReadSingle());
         Assert.Equal(2, reader.ReadSingle());
         Assert.Equal(3, reader.ReadSingle());
@@ -116,7 +120,7 @@ public class SnapshotSerializerTests
 
      DESIGN RULE:
      - Entity ids are restored as state dictionary keys
-     - Position, rotation, velocity, and flags round-trip through the packet
+     - Type, owner, position, rotation, velocity, and flags round-trip through the packet
 
      FAILURE MEANS:
      - Clients cannot reconstruct authoritative entity state
@@ -132,6 +136,8 @@ public class SnapshotSerializerTests
             {
                 [7] = new EntityState
                 {
+                    TypeId = (int)NetworkEntityType.Player,
+                    OwnerId = 3,
                     Position = new Vector3(1, 2, 3),
                     Rotation = new Quaternion(4, 5, 6, 7),
                     Velocity = new Vector3(8, 9, 10),
@@ -145,6 +151,8 @@ public class SnapshotSerializerTests
 
         Assert.Equal(42, deserialized.Tick);
         Assert.True(deserialized.States.ContainsKey(7));
+        Assert.Equal((int)NetworkEntityType.Player, deserialized.States[7].TypeId);
+        Assert.Equal(3, deserialized.States[7].OwnerId);
         Assert.Equal(new Vector3(1, 2, 3), deserialized.States[7].Position);
         Assert.Equal(new Quaternion(4, 5, 6, 7), deserialized.States[7].Rotation);
         Assert.Equal(new Vector3(8, 9, 10), deserialized.States[7].Velocity);

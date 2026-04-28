@@ -35,6 +35,8 @@ public static class NetworkSession
         TickClock = new NetworkTickClock();
         TickClockAdvancer = TickClock.CreateAdvancer();
         ServerHost = NetworkServerHost.StartUdp(port, TickClock);
+        Client = new NetworkClient(new UdpClientTransport("127.0.0.1", port), TickClock);
+        Client.Connect(CreateClientId());
     }
 
     public static void StartClient(string host, int port = DefaultPort)

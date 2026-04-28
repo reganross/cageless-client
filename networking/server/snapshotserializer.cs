@@ -60,6 +60,8 @@ public static class SnapshotSerializer
             var state = kv.Value;
 
             writer.Write(kv.Key);
+            writer.Write(state.TypeId);
+            writer.Write(state.OwnerId);
             writer.Write(state.Position.X);
             writer.Write(state.Position.Y);
             writer.Write(state.Position.Z);
@@ -108,6 +110,8 @@ public static class SnapshotSerializer
             int entityId = reader.ReadInt32();
             var state = new EntityState
             {
+                TypeId = reader.ReadInt32(),
+                OwnerId = reader.ReadInt32(),
                 Position = new Godot.Vector3(
                     reader.ReadSingle(),
                     reader.ReadSingle(),

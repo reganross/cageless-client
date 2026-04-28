@@ -10,6 +10,8 @@ public class NetworkClient : System.IDisposable
     private readonly bool ownsClockAdvancement;
     private readonly NetworkTickClock.Advancer ownedAdvancer;
     private readonly NetworkTickClock.TickCursor tickCursor;
+    private readonly Queue<SnapshotPacket> receivedSnapshots = new();
+    private readonly Dictionary<int, EntityState> latestEntityStates = new();
     private SnapshotPacket latestSnapshot;
     private bool hasLatestSnapshot;
     private PlayerController lastSentController;
@@ -44,6 +46,7 @@ public class NetworkClient : System.IDisposable
     public ClientId ClientId { get; private set; }
     public PlayerController Controller { get; private set; }
     public NetworkTickClock TickClock => tickClock;
+    public IReadOnlyDictionary<int, EntityState> LatestEntityStates => latestEntityStates;
 
     public bool Connect(ClientId clientId)
     {
@@ -121,6 +124,8 @@ public class NetworkClient : System.IDisposable
             {
                 latestSnapshot = SnapshotSerializer.DeserializePacket(bytes);
                 hasLatestSnapshot = true;
+                ApplySnapshotToEntityCache(latestSnapshot);
+                receivedSnapshots.Enqueue(latestSnapshot);
                 received++;
             }
             catch (InvalidDataException)
@@ -135,6 +140,55 @@ public class NetworkClient : System.IDisposable
     {
         snapshot = latestSnapshot;
         return hasLatestSnapshot;
+    }
+
+    public bool TryGetLatestEntityState(int entityId, out EntityState state)
+    {
+        return latestEntityStates.TryGetValue(entityId, out state);
+    }
+
+    public bool TryGetLatestEntityIdForOwner(
+        ClientId ownerId,
+        NetworkEntityType entityType,
+        out int entityId)
+    {
+        foreach (var kv in latestEntityStates)
+        {
+            if (kv.Value.OwnerId == ownerId.Value
+                && kv.Value.TypeId == (int)entityType)
+            {
+                entityId = kv.Key;
+                return true;
+            }
+        }
+
+        entityId = 0;
+        return false;
+    }
+
+    public bool TryDequeueSnapshot(out SnapshotPacket snapshot)
+    {
+        if (receivedSnapshots.Count == 0)
+        {
+            snapshot = default;
+            return false;
+        }
+
+        snapshot = receivedSnapshots.Dequeue();
+        return true;
+    }
+
+    private void ApplySnapshotToEntityCache(SnapshotPacket packet)
+    {
+        if (packet.Kind == SnapshotPacketKind.Full)
+        {
+            latestEntityStates.Clear();
+        }
+
+        foreach (var kv in packet.Frame.States)
+        {
+            latestEntityStates[kv.Key] = kv.Value;
+        }
     }
 
     public bool Disconnect()

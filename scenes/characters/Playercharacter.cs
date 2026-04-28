@@ -22,11 +22,19 @@ public partial class Playercharacter : CharacterBody3D
 	[Export]
 	public StringName ThrustAnimation { get; set; } = "Thrust";
 
+	[Export]
+	public float SnapshotPositionLerpSpeed { get; set; } = 12f;
+
+	[Export]
+	public float SnapshotRotationLerpSpeed { get; set; } = 12f;
+
 	private AnimationPlayer _animationPlayer;
 	private Node3D _cameraPivot;
 	private PlayerController _controller = new();
 	private NetworkTickClock.Advancer _tickClockAdvancer;
+	private ClientSnapshotTruthLayer _truthLayer;
 	private bool _usesLocalInput = true;
+	private int _networkEntityId;
 	private float _pitch;
 	/// <summary>Extra yaw on <see cref="_cameraPivot"/> so look direction can lead the body.</summary>
 	private float _yawOffset;
@@ -113,6 +121,12 @@ public partial class Playercharacter : CharacterBody3D
 		_yawOffset = Mathf.AngleDifference(Rotation.Y, controller.LookYaw);
 	}
 
+	public void UseTruthLayer(int entityId, ClientSnapshotTruthLayer truthLayer)
+	{
+		_networkEntityId = entityId;
+		_truthLayer = truthLayer ?? throw new ArgumentNullException(nameof(truthLayer));
+	}
+
 	public void UseTickClockAdvancer(NetworkTickClock.Advancer tickClockAdvancer)
 	{
 		_tickClockAdvancer = tickClockAdvancer ?? throw new ArgumentNullException(nameof(tickClockAdvancer));
@@ -123,6 +137,13 @@ public partial class Playercharacter : CharacterBody3D
 		if (_usesLocalInput)
 			_tickClockAdvancer?.Advance(delta);
 
+		_truthLayer?.TryApplyTruth(
+			_networkEntityId,
+			this,
+			delta,
+			SnapshotPositionLerpSpeed,
+			SnapshotRotationLerpSpeed);
+
 		float dt = (float)delta;
 		TurnTowardControllerLook(dt);
 
@@ -131,20 +152,23 @@ public partial class Playercharacter : CharacterBody3D
 		if (!IsOnFloor())
 			velocity += GetGravity() * (float)delta;
 
-		if (_controller.GetActionStrength("ui_accept") > 0f && IsOnFloor())
+		if (_usesLocalInput && _controller.GetActionStrength("ui_accept") > 0f && IsOnFloor())
 			velocity.Y = JumpVelocity;
 
-		Vector2 inputDir = _controller.GetMoveDirection();
-		Vector3 direction = (Transform.Basis * new Vector3(inputDir.X, 0, inputDir.Y)).Normalized();
-		if (direction != Vector3.Zero)
+		if (_usesLocalInput)
 		{
-			velocity.X = direction.X * Speed;
-			velocity.Z = direction.Z * Speed;
-		}
-		else
-		{
-			velocity.X = Mathf.MoveToward(Velocity.X, 0, Speed);
-			velocity.Z = Mathf.MoveToward(Velocity.Z, 0, Speed);
+			Vector2 inputDir = _controller.GetMoveDirection();
+			Vector3 direction = (Transform.Basis * new Vector3(inputDir.X, 0, inputDir.Y)).Normalized();
+			if (direction != Vector3.Zero)
+			{
+				velocity.X = direction.X * Speed;
+				velocity.Z = direction.Z * Speed;
+			}
+			else
+			{
+				velocity.X = Mathf.MoveToward(Velocity.X, 0, Speed);
+				velocity.Z = Mathf.MoveToward(Velocity.Z, 0, Speed);
+			}
 		}
 
 		Velocity = velocity;

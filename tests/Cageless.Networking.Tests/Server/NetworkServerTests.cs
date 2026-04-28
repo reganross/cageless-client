@@ -192,6 +192,58 @@ public class NetworkServerTests
 
     /*
      PURPOSE:
+     Ensure a connected client gets an authoritative player entity on the server.
+
+     DESIGN RULE:
+     - Client connection creates one server-side player entity
+     - Player entity snapshots identify the scene type and owning client
+
+     FAILURE MEANS:
+     - Server simulation may have no player for a joined client
+     - Clients may not know which remote scene to spawn
+    */
+    [Fact]
+    public void ConnectClient_ShouldCreateAuthoritativePlayerEntity()
+    {
+        var server = new NetworkServer(historySize: 4);
+        var clientId = new ClientId(7);
+
+        Assert.True(server.ConnectClient(clientId));
+        server.RecordSnapshot(tick: 42);
+
+        var snapshot = server.GetLatestSnapshot();
+        var state = Assert.Single(snapshot.States).Value;
+        Assert.Equal((int)NetworkEntityType.Player, state.TypeId);
+        Assert.Equal(clientId.Value, state.OwnerId);
+    }
+
+    /*
+     PURPOSE:
+     Ensure duplicate connect packets do not create duplicate server players.
+
+     DESIGN RULE:
+     - Client connection is idempotent
+     - Each connected client owns exactly one authoritative player entity
+
+     FAILURE MEANS:
+     - Repeated UDP connect packets may spawn extra players
+     - Snapshot replication may create duplicate remote player nodes
+    */
+    [Fact]
+    public void ConnectClient_ShouldNotCreateDuplicatePlayerEntity()
+    {
+        var server = new NetworkServer(historySize: 4);
+        var clientId = new ClientId(7);
+
+        Assert.True(server.ConnectClient(clientId));
+        Assert.True(server.ConnectClient(clientId));
+        server.RecordSnapshot(tick: 42);
+
+        Assert.Single(server.GetLatestSnapshot().States);
+    }
+
+    /*
+     PURPOSE:
      Ensure disconnecting a client frees its connection slot.
 
      DESIGN RULE:
@@ -214,6 +266,31 @@ public class NetworkServerTests
         server.DisconnectClient(new ClientId(4));
 
         Assert.True(server.ConnectClient(new ClientId(5)));
+    }
+
+    /*
+     PURPOSE:
+     Ensure disconnecting a client removes its authoritative player entity.
+
+     DESIGN RULE:
+     - Disconnected player entities no longer appear in new snapshots
+     - Client-side replication can despawn entities missing from a full snapshot
+
+     FAILURE MEANS:
+     - Disconnected players may remain in the authoritative simulation
+     - Clients may keep stale remote player nodes alive
+    */
+    [Fact]
+    public void DisconnectClient_ShouldRemoveAuthoritativePlayerEntity()
+    {
+        var server = new NetworkServer(historySize: 4);
+        var clientId = new ClientId(7);
+
+        server.ConnectClient(clientId);
+        server.DisconnectClient(clientId);
+        server.RecordSnapshot(tick: 42);
+
+        Assert.Empty(server.GetLatestSnapshot().States);
     }
 
     /*
@@ -244,7 +321,7 @@ public class NetworkServerTests
         Assert.True(server.TryDequeueSnapshotPacket(new ClientId(1), out var packet));
         Assert.Equal(SnapshotPacketKind.Full, packet.Kind);
         Assert.Equal(42, packet.Frame.Tick);
-        Assert.Single(packet.Frame.States);
+        Assert.Equal(2, packet.Frame.States.Count);
     }
 
     /*
@@ -392,7 +469,7 @@ public class NetworkServerTests
 
         Assert.True(server.TryDequeueSnapshotPacket(secondClient, out var secondPacket));
         Assert.Equal(SnapshotPacketKind.Full, secondPacket.Kind);
-        Assert.Single(secondPacket.Frame.States);
+        Assert.Equal(3, secondPacket.Frame.States.Count);
     }
 
     /*
@@ -429,7 +506,7 @@ public class NetworkServerTests
         Assert.Equal(SnapshotPacketKind.Full, transport.SentSnapshots[0].Packet.Kind);
         Assert.Equal(SnapshotPacketKind.Delta, transport.SentSnapshots[1].Packet.Kind);
         Assert.Equal(SnapshotPacketKind.Full, transport.SentSnapshots[2].Packet.Kind);
-        Assert.Single(transport.SentSnapshots[2].Snapshot.States);
+        Assert.Equal(2, transport.SentSnapshots[2].Snapshot.States.Count);
     }
 
     /*

@@ -22,7 +22,7 @@ public class PlayerControllerSerializerTests
     {
         var controller = new PlayerController(
             new ClientId(3),
-            sequence: 12,
+                tick: 12,
             new[]
             {
                 new InputActionState("left", 0),
@@ -37,7 +37,7 @@ public class PlayerControllerSerializerTests
         var deserialized = PlayerControllerSerializer.Deserialize(bytes);
 
         Assert.Equal(new ClientId(3), deserialized.PlayerId);
-        Assert.Equal(12, deserialized.Sequence);
+        Assert.Equal(12, deserialized.Tick);
         Assert.Equal(5, deserialized.Actions.Count);
         Assert.Equal(1, deserialized.GetActionStrength("right"));
         Assert.Equal(1, deserialized.GetActionStrength("forward"));
@@ -63,7 +63,7 @@ public class PlayerControllerSerializerTests
     {
         var controller = new PlayerController(
             new ClientId(9),
-            sequence: 44,
+                tick: 44,
             new[]
             {
                 new InputActionState("forward", 1)
@@ -103,7 +103,7 @@ public class PlayerControllerSerializerTests
 
      DESIGN RULE:
      - Server command queue consumes controller commands
-     - Controller conversion keeps player id and sequence
+     - Controller conversion keeps player id and tick
 
      FAILURE MEANS:
      - Controller input cannot enter authoritative simulation queue
@@ -114,7 +114,7 @@ public class PlayerControllerSerializerTests
     {
         var controller = new PlayerController(
             new ClientId(3),
-            sequence: 12,
+            tick: 12,
             new[]
             {
                 new InputActionState("left", 0),
@@ -127,7 +127,7 @@ public class PlayerControllerSerializerTests
         var command = controller.ToCommandPacket();
 
         Assert.Equal(new ClientId(3), command.ClientId);
-        Assert.Equal(12, command.Sequence);
+        Assert.Equal(12, command.Tick);
         Assert.Equal(ClientCommandKind.Controller, command.Kind);
         Assert.Equal(1, command.Controller.GetActionStrength("right"));
         Assert.Equal(1, command.Controller.GetActionStrength("forward"));
@@ -151,7 +151,7 @@ public class PlayerControllerSerializerTests
     {
         var controller = new PlayerController(
             new ClientId(3),
-            sequence: 12,
+            tick: 12,
             new[]
             {
                 new InputActionState("forward", 1),
@@ -178,7 +178,7 @@ public class PlayerControllerSerializerTests
     [Fact]
     public void SetActionStrength_ShouldUpdateCurrentActionState()
     {
-        var controller = new PlayerController(new ClientId(3), sequence: 12);
+        var controller = new PlayerController(new ClientId(3), tick: 12);
 
         controller.SetActionStrength("forward", 1);
         controller.SetActionStrength("forward", 0);
@@ -203,7 +203,7 @@ public class PlayerControllerSerializerTests
     [Fact]
     public void SetLookRotation_ShouldUpdateCurrentLookState()
     {
-        var controller = new PlayerController(new ClientId(3), sequence: 12);
+        var controller = new PlayerController(new ClientId(3), tick: 12);
 
         controller.SetLookRotation(yaw: 1.5f, pitch: -0.25f);
 
@@ -226,7 +226,7 @@ public class PlayerControllerSerializerTests
     [Fact]
     public void Serialize_ShouldUseLatestLookState()
     {
-        var controller = new PlayerController(new ClientId(3), sequence: 12);
+        var controller = new PlayerController(new ClientId(3), tick: 12);
 
         controller.SetLookRotation(yaw: 1.5f, pitch: -0.25f);
 
@@ -252,7 +252,7 @@ public class PlayerControllerSerializerTests
     [Fact]
     public void Serialize_ShouldUseLatestActionState()
     {
-        var controller = new PlayerController(new ClientId(3), sequence: 12);
+        var controller = new PlayerController(new ClientId(3), tick: 12);
 
         controller.SetActionStrength("forward", 1);
         controller.SetActionStrength("ui_accept", 1);
@@ -279,7 +279,7 @@ public class PlayerControllerSerializerTests
     [Fact]
     public void GetMoveDirection_ShouldDeriveDirectionFromActionState()
     {
-        var controller = new PlayerController(new ClientId(3), sequence: 12);
+        var controller = new PlayerController(new ClientId(3), tick: 12);
 
         controller.SetActionStrength("right", 1);
         controller.SetActionStrength("forward", 1);

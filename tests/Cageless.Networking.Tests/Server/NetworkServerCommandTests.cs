@@ -19,14 +19,14 @@ public class NetworkServerCommandTests
     {
         var server = new NetworkServer(historySize: 4);
         var clientId = new ClientId(1);
-        var command = CreateCommand(clientId, sequence: 1);
+        var command = CreateCommand(clientId, tick: 1);
 
         server.ConnectClient(clientId);
         var accepted = server.ReceiveCommand(command);
 
         Assert.True(accepted);
         Assert.True(server.TryDequeueCommand(clientId, out var dequeued));
-        Assert.Equal(command.Sequence, dequeued.Sequence);
+        Assert.Equal(command.Tick, dequeued.Tick);
         Assert.Equal(1, dequeued.Controller.GetActionStrength("forward"));
     }
 
@@ -51,8 +51,8 @@ public class NetworkServerCommandTests
 
         server.ConnectClient(firstClient);
         server.ConnectClient(secondClient);
-        server.ReceiveCommand(CreateCommand(firstClient, sequence: 1, actionName: "right"));
-        server.ReceiveCommand(CreateCommand(secondClient, sequence: 1, actionName: "left"));
+        server.ReceiveCommand(CreateCommand(firstClient, tick: 1, actionName: "right"));
+        server.ReceiveCommand(CreateCommand(secondClient, tick: 1, actionName: "left"));
 
         Assert.True(server.TryDequeueCommand(firstClient, out var firstCommand));
         Assert.True(server.TryDequeueCommand(secondClient, out var secondCommand));
@@ -78,7 +78,7 @@ public class NetworkServerCommandTests
         var server = new NetworkServer(historySize: 4);
         var clientId = new ClientId(1);
 
-        var accepted = server.ReceiveCommand(CreateCommand(clientId, sequence: 1));
+        var accepted = server.ReceiveCommand(CreateCommand(clientId, tick: 1));
 
         Assert.False(accepted);
         Assert.False(server.TryDequeueCommand(clientId, out _));
@@ -86,26 +86,26 @@ public class NetworkServerCommandTests
 
     /*
      PURPOSE:
-     Ensure duplicate or older command sequences are rejected.
+     Ensure duplicate or older command ticks are rejected.
 
      DESIGN RULE:
-     - Sequence numbers increase per client
-     - Server accepts each client command sequence once
+     - Controller tick numbers increase per client
+     - Server accepts each client command tick once
 
      FAILURE MEANS:
      - Duplicate UDP packets may apply input more than once
      - Out-of-order packets may rewind client intent
     */
     [Fact]
-    public void ReceiveCommand_ShouldRejectDuplicateOrOlderSequences()
+    public void ReceiveCommand_ShouldRejectDuplicateOrOlderTicks()
     {
         var server = new NetworkServer(historySize: 4);
         var clientId = new ClientId(1);
 
         server.ConnectClient(clientId);
-        Assert.True(server.ReceiveCommand(CreateCommand(clientId, sequence: 2)));
-        Assert.False(server.ReceiveCommand(CreateCommand(clientId, sequence: 2)));
-        Assert.False(server.ReceiveCommand(CreateCommand(clientId, sequence: 1)));
+        Assert.True(server.ReceiveCommand(CreateCommand(clientId, tick: 2)));
+        Assert.False(server.ReceiveCommand(CreateCommand(clientId, tick: 2)));
+        Assert.False(server.ReceiveCommand(CreateCommand(clientId, tick: 1)));
     }
 
     /*
@@ -127,23 +127,64 @@ public class NetworkServerCommandTests
         var clientId = new ClientId(1);
 
         server.ConnectClient(clientId);
-        var accepted = server.ReceiveCommand(CreateCommand(clientId, sequence: 1, actionName: "right"));
+        var accepted = server.ReceiveCommand(CreateCommand(clientId, tick: 1, actionName: "right"));
 
         Assert.True(accepted);
         Assert.True(server.Controllers.TryGet(clientId, out var controller));
         Assert.Equal(1, controller.GetActionStrength("right"));
     }
 
+    /*
+     PURPOSE:
+     Ensure accepted delta commands update managed controller state in place.
+
+     DESIGN RULE:
+     - Delta controller packets merge into the existing server controller
+     - Missing delta fields do not clear previous controller state
+
+     FAILURE MEANS:
+     - Server simulation may lose held inputs between full controller packets
+     - Delta packets may replace instead of mutate managed controllers
+    */
+    [Fact]
+    public void ReceiveCommand_ShouldApplyDeltaControllerCommand()
+    {
+        var server = new NetworkServer(historySize: 4);
+        var clientId = new ClientId(1);
+
+        server.ConnectClient(clientId);
+        server.ReceiveCommand(CreateCommand(clientId, tick: 1, actionName: "forward"));
+        var delta = new PlayerController(
+            clientId,
+            tick: 2,
+            new[]
+            {
+                new InputActionState("right", 1)
+            });
+        var accepted = server.ReceiveCommand(new ClientCommandPacket(
+            ClientCommandKind.Controller,
+            ControllerPacketKind.Delta,
+            hasLookRotation: false,
+            delta));
+
+        Assert.True(accepted);
+        Assert.True(server.Controllers.TryGet(clientId, out var controller));
+        Assert.Equal(1, controller.GetActionStrength("forward"));
+        Assert.Equal(1, controller.GetActionStrength("right"));
+    }
+
     private static ClientCommandPacket CreateCommand(
         ClientId clientId,
-        int sequence,
+        int tick,
         string actionName = "forward")
     {
         return new ClientCommandPacket(
             ClientCommandKind.Controller,
+            ControllerPacketKind.Full,
+            hasLookRotation: true,
             new PlayerController(
                 clientId,
-                sequence,
+                tick,
                 new[]
                 {
                     new InputActionState(actionName, 1)

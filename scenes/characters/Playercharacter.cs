@@ -25,6 +25,7 @@ public partial class Playercharacter : CharacterBody3D
 	private AnimationPlayer _animationPlayer;
 	private Node3D _cameraPivot;
 	private PlayerController _controller = new();
+	private NetworkTickClock.Advancer _tickClockAdvancer;
 	private bool _usesLocalInput = true;
 	private float _pitch;
 	/// <summary>Extra yaw on <see cref="_cameraPivot"/> so look direction can lead the body.</summary>
@@ -97,6 +98,7 @@ public partial class Playercharacter : CharacterBody3D
 	}
 
 	public PlayerController Controller => _controller;
+	public NetworkTickClock.Advancer TickClockAdvancer => _tickClockAdvancer;
 
 	public void UseController(PlayerController controller)
 	{
@@ -106,8 +108,16 @@ public partial class Playercharacter : CharacterBody3D
 		_yawOffset = Mathf.AngleDifference(Rotation.Y, controller.LookYaw);
 	}
 
+	public void UseTickClockAdvancer(NetworkTickClock.Advancer tickClockAdvancer)
+	{
+		_tickClockAdvancer = tickClockAdvancer ?? throw new ArgumentNullException(nameof(tickClockAdvancer));
+	}
+
 	public override void _PhysicsProcess(double delta)
 	{
+		if (_usesLocalInput)
+			_tickClockAdvancer?.Advance(delta);
+
 		float dt = (float)delta;
 		TurnTowardControllerLook(dt);
 

@@ -8,7 +8,7 @@ public class NetworkServer
     private readonly Dictionary<ClientId, Queue<ClientCommandPacket>> inboundCommands = new();
     private readonly Dictionary<ClientId, NetworkActivityState> clientActivityStates = new();
     private readonly Dictionary<ClientId, double> clientAccumulatedSeconds = new();
-    private readonly Dictionary<ClientId, int> lastCommandSequences = new();
+    private readonly Dictionary<ClientId, int> lastCommandTicks = new();
     private readonly Dictionary<int, EntityState> lastSentStates = new();
     private readonly IServerSnapshotTransport transport;
     private readonly SnapshotDeltaPolicy deltaPolicy;
@@ -78,7 +78,7 @@ public class NetworkServer
         inboundCommands.Remove(clientId);
         clientActivityStates.Remove(clientId);
         clientAccumulatedSeconds.Remove(clientId);
-        lastCommandSequences.Remove(clientId);
+        lastCommandTicks.Remove(clientId);
         Controllers.Remove(clientId);
     }
 
@@ -200,15 +200,15 @@ public class NetworkServer
             return false;
         }
 
-        if (lastCommandSequences.TryGetValue(command.ClientId, out var lastSequence)
-            && command.Sequence <= lastSequence)
+        if (lastCommandTicks.TryGetValue(command.ClientId, out var lastTick)
+            && command.Tick <= lastTick)
         {
             return false;
         }
 
         queue.Enqueue(command);
-        Controllers.Apply(command.Controller);
-        lastCommandSequences[command.ClientId] = command.Sequence;
+        Controllers.Apply(command);
+        lastCommandTicks[command.ClientId] = command.Tick;
         return true;
     }
 

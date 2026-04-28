@@ -21,9 +21,11 @@ public class ClientCommandSerializerTests
     {
         var packet = new ClientCommandPacket(
             ClientCommandKind.Controller,
+            ControllerPacketKind.Full,
+            hasLookRotation: true,
             new PlayerController(
                 new ClientId(3),
-                sequence: 12,
+                tick: 12,
                 new[]
                 {
                     new InputActionState("right", 1),
@@ -35,7 +37,8 @@ public class ClientCommandSerializerTests
         var deserialized = ClientCommandSerializer.Deserialize(bytes);
 
         Assert.Equal(new ClientId(3), deserialized.ClientId);
-        Assert.Equal(12, deserialized.Sequence);
+        Assert.Equal(12, deserialized.Tick);
+        Assert.Equal(ControllerPacketKind.Full, deserialized.ControllerPacketKind);
         Assert.Equal(ClientCommandKind.Controller, deserialized.Kind);
         Assert.Equal(1, deserialized.Controller.GetActionStrength("right"));
         Assert.Equal(1, deserialized.Controller.GetActionStrength("forward"));
@@ -44,24 +47,26 @@ public class ClientCommandSerializerTests
 
     /*
      PURPOSE:
-     Ensure command packets preserve ordering metadata.
+     Ensure command packets preserve tick metadata.
 
      DESIGN RULE:
-     - Sequence numbers are included for UDP deduplication
-     - Server can reject duplicate or older commands
+     - Controller tick numbers are included for UDP deduplication
+     - Server can reject duplicate or older controller ticks
 
      FAILURE MEANS:
-     - Server may process commands out of order
+     - Server may process controller ticks out of order
      - Duplicate UDP packets may be applied more than once
     */
     [Fact]
-    public void Serialize_ShouldPreserveClientIdAndSequence()
+    public void Serialize_ShouldPreserveClientIdAndTick()
     {
         var packet = new ClientCommandPacket(
             ClientCommandKind.Controller,
+            ControllerPacketKind.Full,
+            hasLookRotation: true,
             new PlayerController(
                 new ClientId(9),
-                sequence: 44,
+                tick: 44,
                 new[]
                 {
                     new InputActionState("forward", 1)
@@ -71,7 +76,7 @@ public class ClientCommandSerializerTests
             ClientCommandSerializer.Serialize(packet));
 
         Assert.Equal(new ClientId(9), deserialized.ClientId);
-        Assert.Equal(44, deserialized.Sequence);
+        Assert.Equal(44, deserialized.Tick);
     }
 
     /*

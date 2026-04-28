@@ -102,6 +102,34 @@ public class NetworkServerNodeTests
         Assert.Equal(0, sentSnapshot.Snapshot.Tick);
     }
 
+    /*
+     PURPOSE:
+     Ensure the server tick driver can use an externally owned network clock.
+
+     DESIGN RULE:
+     - Server and client timing use the same NetworkTickClock type
+     - The driver consumes pending ticks requested from that clock
+
+     FAILURE MEANS:
+     - Server snapshot timing may diverge from shared clock behavior
+     - Server tick driver may keep separate ad hoc accumulation logic
+    */
+    [Fact]
+    public void ProcessPendingTicks_ShouldUseExternallyAdvancedClock()
+    {
+        var transport = new FakeServerSnapshotTransport(new ClientId(1));
+        var server = new NetworkServer(historySize: 4, transport);
+        var clock = new NetworkTickClock(tickIntervalSeconds: 0.1);
+        var driver = new NetworkServerTickDriver(server, clock);
+        var advancer = clock.CreateAdvancer();
+
+        advancer.Advance(0.1);
+        driver.ProcessPendingTicks();
+
+        Assert.Single(transport.SentSnapshots);
+        Assert.Equal(0, transport.SentSnapshots[0].Snapshot.Tick);
+    }
+
     private static NetworkServerTickDriver CreateDriver(
         FakeServerSnapshotTransport transport,
         double snapshotIntervalSeconds)

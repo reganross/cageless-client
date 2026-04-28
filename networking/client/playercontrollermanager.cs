@@ -8,7 +8,7 @@ public class PlayerControllerManager
     {
         if (!controllers.TryGetValue(playerId, out var controller))
         {
-            controller = new PlayerController(playerId, sequence: 0);
+            controller = new PlayerController(playerId, tick: 0);
             controllers[playerId] = controller;
         }
 
@@ -28,6 +28,25 @@ public class PlayerControllerManager
         }
 
         controller.ApplySnapshot(snapshot);
+        return true;
+    }
+
+    public bool Apply(ClientCommandPacket command)
+    {
+        if (!controllers.TryGetValue(command.ClientId, out var controller))
+        {
+            return false;
+        }
+
+        if (command.ControllerPacketKind == ControllerPacketKind.Full)
+        {
+            controller.ApplySnapshot(command.Controller);
+        }
+        else
+        {
+            controller.ApplyDelta(command.Controller, command.HasLookRotation);
+        }
+
         return true;
     }
 

@@ -4,26 +4,26 @@ using Godot;
 public class PlayerController
 {
     private readonly Dictionary<string, float> actionStrengths = new();
-    private int sequence;
+    private int tick;
 
-    public PlayerController(int sequence = 0)
+    public PlayerController(int tick = 0)
     {
-        this.sequence = sequence;
+        this.tick = tick;
         HasPlayerId = false;
     }
 
-    public PlayerController(ClientId playerId, int sequence)
-        : this(playerId, sequence, new List<InputActionState>())
+    public PlayerController(ClientId playerId, int tick)
+        : this(playerId, tick, new List<InputActionState>())
     {
     }
 
     public PlayerController(
         ClientId playerId,
-        int sequence,
+        int tick,
         IEnumerable<InputActionState> actions)
     {
         PlayerId = playerId;
-        this.sequence = sequence;
+        this.tick = tick;
         HasPlayerId = true;
 
         foreach (var action in actions)
@@ -34,7 +34,7 @@ public class PlayerController
 
     public bool HasPlayerId { get; }
     public ClientId PlayerId { get; }
-    public int Sequence => sequence;
+    public int Tick => tick;
     public float LookYaw { get; private set; }
     public float LookPitch { get; private set; }
     public IReadOnlyList<InputActionState> Actions
@@ -62,9 +62,14 @@ public class PlayerController
         LookPitch = pitch;
     }
 
+    public void SetTick(int tick)
+    {
+        this.tick = tick;
+    }
+
     public void ApplySnapshot(PlayerController snapshot)
     {
-        sequence = snapshot.Sequence;
+        tick = snapshot.Tick;
         actionStrengths.Clear();
 
         foreach (var action in snapshot.Actions)
@@ -73,6 +78,21 @@ public class PlayerController
         }
 
         SetLookRotation(snapshot.LookYaw, snapshot.LookPitch);
+    }
+
+    public void ApplyDelta(PlayerController delta, bool hasLookRotation)
+    {
+        tick = delta.Tick;
+
+        foreach (var action in delta.Actions)
+        {
+            SetActionStrength(action.ActionName, action.Strength);
+        }
+
+        if (hasLookRotation)
+        {
+            SetLookRotation(delta.LookYaw, delta.LookPitch);
+        }
     }
 
     public float GetActionStrength(string actionName)
@@ -98,6 +118,8 @@ public class PlayerController
 
         return new ClientCommandPacket(
             ClientCommandKind.Controller,
+            ControllerPacketKind.Full,
+            hasLookRotation: true,
             this);
     }
 }

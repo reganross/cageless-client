@@ -32,6 +32,7 @@ public partial class CombatWaveManager : Node3D
 	private int _waveIndex;
 	private int _remainingInWave;
 	private Node3D _enemyWaves;
+	private NetworkTickClock.Advancer _localPlayerTickClockAdvancer;
 
 	public override void _Ready()
 	{
@@ -57,8 +58,17 @@ public partial class CombatWaveManager : Node3D
 
 		var player = PlayerScene.Instantiate<Playercharacter>();
 		player.WeaponScene = PlayerWeaponScene;
+		var tickClock = new NetworkTickClock();
+		_localPlayerTickClockAdvancer = tickClock.CreateAdvancer();
+		player.UseTickClockAdvancer(_localPlayerTickClockAdvancer);
 		AddChild(player);
 		player.GlobalPosition = PlayerSpawnPosition;
+	}
+
+	public override void _ExitTree()
+	{
+		_localPlayerTickClockAdvancer?.Dispose();
+		_localPlayerTickClockAdvancer = null;
 	}
 
 	private void StartNextWave()

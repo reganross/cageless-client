@@ -1,0 +1,181 @@
+# Git LFS (Large File Storage) Guide
+
+Git LFS is a Git extension for managing large binary files (textures, models, audio, video) without bloating repository history.
+
+---
+
+# Why Git LFS?
+
+Git is designed for text-based files. Large binaries cause problems:
+
+- Repositories grow extremely large
+- Cloning becomes slow
+- History duplicates full binary files
+- Collaboration becomes inefficient
+
+Git LFS fixes this by storing:
+- Small pointer files in Git
+- Actual file data in LFS storage
+
+---
+
+# Installation
+
+## macOS
+brew install git-lfs
+
+
+## Windows
+
+Download installer:
+https://git-lfs.com
+
+## Linux (Debian/Ubuntu)
+sudo apt install git-lfs
+
+
+---
+
+# Enable Git LFS
+
+Run once per machine:
+git lfs install
+
+
+---
+
+# Tracking Files
+
+Define which file types Git LFS should manage:
+git lfs track ".png"
+git lfs track ".jpg"
+git lfs track ".fbx"
+git lfs track ".blend"
+git lfs track ".wav"
+git lfs track ".mp4"
+
+
+This creates or updates `.gitattributes`.
+
+---
+
+# Initial Setup
+git add .gitattributes
+git add Assets/
+git commit -m "Configure Git LFS and add assets"
+git push origin main
+
+
+---
+
+# How Git LFS Works
+
+When you commit a tracked file:
+
+- Git stores a small pointer file
+- LFS stores the actual binary data
+- On clone, LFS downloads the real files
+
+---
+
+# Cloning a Repo with LFS
+
+## Normal clone
+git clone <repo-url>
+
+
+## Skip downloading LFS files initially
+GIT_LFS_SKIP_SMUDGE=1 git clone <repo-url>
+
+
+Then:
+git lfs pull
+
+---
+
+# Checking LFS Status
+
+## Show tracked patterns
+git lfs track
+
+
+## List LFS files
+git lfs ls-files
+
+---
+
+# Updating Tracking Rules
+git lfs track "*.tga"
+git add .gitattributes
+git commit -m "Track TGA files with LFS"
+
+
+---
+
+# Useful Commands
+
+## Pull LFS files
+git lfs pull
+
+
+## Fetch without checkout
+git lfs fetch
+
+
+## Verify LFS files
+git lfs ls-files
+
+
+---
+
+# Fixing Mistakes
+
+If files were committed before LFS:
+git lfs migrate import --include=".fbx,.png"
+
+
+⚠️ This rewrites Git history and affects collaborators.
+
+---
+
+# Best Practices
+
+- Use LFS for binary assets (textures, models, audio)
+- Do NOT commit build outputs
+- Ignore generated files via `.gitignore`
+- Keep repository structure clean and modular
+- Avoid frequently-changing large binaries
+
+---
+
+# Recommended Project Structure
+/Assets
+/Textures
+/Models
+/Audio
+/UI
+/Source
+/Docs
+/Build
+
+
+---
+
+# When NOT to Use Git LFS
+
+Avoid LFS for:
+
+- Large frequently-changing datasets (multi-GB)
+- Build artifacts
+- Cache or temporary files
+
+Instead use:
+- Cloud storage (S3, Drive, etc.)
+- CI/CD artifact storage
+- Dedicated asset servers
+
+---
+
+# Summary
+
+Git LFS allows Git to handle large binary assets efficiently by storing pointers in Git and real files in LFS storage, keeping repositories fast and manageable.

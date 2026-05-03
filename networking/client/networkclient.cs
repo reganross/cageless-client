@@ -1,0 +1,362 @@
+using System.Collections.Generic;
+using System.IO;
+
+public class NetworkClient : System.IDisposable
+{
+    private const int FullControllerIntervalTicks = 5;
+
+    private readonly IClientTransport transport;
+    private readonly NetworkTickClock tickClock;
+    private readonly bool ownsClockAdvancement;
+    private readonly NetworkTickClock.Advancer ownedAdvancer;
+    private readonly NetworkTickClock.TickCursor tickCursor;
+    private readonly Queue<SnapshotPacket> receivedSnapshots = new();
+    private readonly Dictionary<int, EntityState> latestEntityStates = new();
+    private SnapshotPacket latestSnapshot;
+    private bool hasLatestSnapshot;
+    private PlayerController lastSentController;
+    private bool disposed;
+
+    public NetworkClient(IClientTransport transport)
+        : this(transport, new NetworkTickClock(), ownsClockAdvancement: true)
+    {
+    }
+
+    public NetworkClient(IClientTransport transport, NetworkTickClock tickClock)
+        : this(transport, tickClock, ownsClockAdvancement: false)
+    {
+    }
+
+    private NetworkClient(
+        IClientTransport transport,
+        NetworkTickClock tickClock,
+        bool ownsClockAdvancement)
+    {
+        this.transport = transport;
+        this.tickClock = tickClock ?? throw new System.ArgumentNullException(nameof(tickClock));
+        this.ownsClockAdvancement = ownsClockAdvancement;
+        tickCursor = tickClock.CreateCursor();
+        ownedAdvancer = ownsClockAdvancement
+            ? tickClock.CreateAdvancer()
+            : null;
+        Controller = new PlayerController();
+    }
+
+    public bool IsConnected { get; private set; }
+    public ClientId ClientId { get; private set; }
+    public PlayerController Controller { get; private set; }
+    public NetworkTickClock TickClock => tickClock;
+    public IReadOnlyDictionary<int, EntityState> LatestEntityStates => latestEntityStates;
+
+    public bool Connect(ClientId clientId)
+    {
+        if (IsConnected)
+        {
+            return false;
+        }
+
+        ClientId = clientId;
+        Controller = new PlayerController(clientId, tick: 0);
+        lastSentController = CopyController(Controller, tick: 0);
+        if (ownsClockAdvancement)
+        {
+            tickClock.Reset();
+        }
+
+        tickCursor.ResetToCurrent();
+        IsConnected = true;
+
+        transport.Send(CreateClientIdPacket(ClientPacketKind.Connect, clientId));
+        return true;
+    }
+
+    public bool SendControllerUpdate()
+    {
+        if (!IsConnected)
+        {
+            return false;
+        }
+
+        return SendFullControllerPacket(tickClock.CurrentTick);
+    }
+
+    public int Tick(double deltaSeconds)
+    {
+        if (!IsConnected || ownedAdvancer == null)
+        {
+            return 0;
+        }
+
+        ownedAdvancer.Advance(deltaSeconds);
+        return ProcessPendingTicks();
+    }
+
+    public int ProcessPendingTicks()
+    {
+        if (!IsConnected)
+        {
+            return 0;
+        }
+
+        int sent = 0;
+        while (tickCursor.TryRequestTick(out int tick))
+        {
+            Controller.SetTick(tick);
+
+            if (ProcessControllerTick(tick))
+            {
+                sent++;
+            }
+        }
+
+        return sent;
+    }
+
+    public int ReceiveSnapshots()
+    {
+        ThrowIfDisposed();
+
+        int received = 0;
+
+        while (transport.TryReceive(out var bytes))
+        {
+            try
+            {
+                latestSnapshot = SnapshotSerializer.DeserializePacket(bytes);
+                hasLatestSnapshot = true;
+                ApplySnapshotToEntityCache(latestSnapshot);
+                receivedSnapshots.Enqueue(latestSnapshot);
+                received++;
+            }
+            catch (InvalidDataException)
+            {
+            }
+        }
+
+        return received;
+    }
+
+    public bool TryGetLatestSnapshot(out SnapshotPacket snapshot)
+    {
+        snapshot = latestSnapshot;
+        return hasLatestSnapshot;
+    }
+
+    public bool TryGetLatestEntityState(int entityId, out EntityState state)
+    {
+        return latestEntityStates.TryGetValue(entityId, out state);
+    }
+
+    public bool TryGetLatestEntityIdForOwner(
+        ClientId ownerId,
+        NetworkEntityType entityType,
+        out int entityId)
+    {
+        foreach (var kv in latestEntityStates)
+        {
+            if (kv.Value.OwnerId == ownerId.Value
+                && kv.Value.TypeId == (int)entityType)
+            {
+                entityId = kv.Key;
+                return true;
+            }
+        }
+
+        entityId = 0;
+        return false;
+    }
+
+    public bool TryDequeueSnapshot(out SnapshotPacket snapshot)
+    {
+        if (receivedSnapshots.Count == 0)
+        {
+            snapshot = default;
+            return false;
+        }
+
+        snapshot = receivedSnapshots.Dequeue();
+        return true;
+    }
+
+    private void ApplySnapshotToEntityCache(SnapshotPacket packet)
+    {
+        if (packet.Kind == SnapshotPacketKind.Full)
+        {
+            latestEntityStates.Clear();
+        }
+
+        foreach (var kv in packet.Frame.States)
+        {
+            latestEntityStates[kv.Key] = kv.Value;
+        }
+    }
+
+    public bool Disconnect()
+    {
+        ThrowIfDisposed();
+
+        if (!IsConnected)
+        {
+            return false;
+        }
+
+        transport.Send(CreateClientIdPacket(ClientPacketKind.Disconnect, ClientId));
+        IsConnected = false;
+        Controller = new PlayerController();
+        lastSentController = null;
+        if (ownsClockAdvancement)
+        {
+            tickClock.Reset();
+        }
+
+        tickCursor.ResetToCurrent();
+        return true;
+    }
+
+    public void Dispose()
+    {
+        if (disposed)
+        {
+            return;
+        }
+
+        if (IsConnected)
+        {
+            Disconnect();
+        }
+
+        disposed = true;
+        ownedAdvancer?.Dispose();
+        transport.Dispose();
+    }
+
+    private bool ProcessControllerTick(int tick)
+    {
+        if (tick % FullControllerIntervalTicks == 0)
+        {
+            return SendFullControllerPacket(tick);
+        }
+
+        var changedActions = GetChangedActions(Controller, lastSentController);
+        bool hasLookRotation = HasLookRotationChanged(Controller, lastSentController);
+        if (changedActions.Count == 0 && !hasLookRotation)
+        {
+            return false;
+        }
+
+        var deltaController = new PlayerController(ClientId, tick, changedActions);
+        if (hasLookRotation)
+        {
+            deltaController.SetLookRotation(Controller.LookYaw, Controller.LookPitch);
+        }
+
+        SendControllerCommand(new ClientCommandPacket(
+            ClientCommandKind.Controller,
+            ControllerPacketKind.Delta,
+            hasLookRotation,
+            deltaController));
+        lastSentController = CopyController(Controller, tick);
+        return true;
+    }
+
+    private bool SendFullControllerPacket(int tick)
+    {
+        var snapshot = CopyController(Controller, tick);
+        SendControllerCommand(new ClientCommandPacket(
+            ClientCommandKind.Controller,
+            ControllerPacketKind.Full,
+            hasLookRotation: true,
+            snapshot));
+        lastSentController = CopyController(Controller, tick);
+        return true;
+    }
+
+    private void SendControllerCommand(ClientCommandPacket command)
+    {
+        ThrowIfDisposed();
+
+        var payload = ClientCommandSerializer.Serialize(command);
+        transport.Send(CreatePayloadPacket(ClientPacketKind.Controller, payload));
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (disposed)
+        {
+            throw new System.ObjectDisposedException(nameof(NetworkClient));
+        }
+    }
+
+    private static byte[] CreateClientIdPacket(ClientPacketKind kind, ClientId clientId)
+    {
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream);
+
+        writer.Write((int)kind);
+        writer.Write(clientId.Value);
+        return stream.ToArray();
+    }
+
+    private static byte[] CreatePayloadPacket(ClientPacketKind kind, byte[] payload)
+    {
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream);
+
+        writer.Write((int)kind);
+        writer.Write(payload.Length);
+        writer.Write(payload);
+        return stream.ToArray();
+    }
+
+    private static PlayerController CopyController(PlayerController source, int tick)
+    {
+        var copy = new PlayerController(source.PlayerId, tick, source.Actions);
+        copy.SetLookRotation(source.LookYaw, source.LookPitch);
+        return copy;
+    }
+
+    private static List<InputActionState> GetChangedActions(
+        PlayerController current,
+        PlayerController baseline)
+    {
+        var changedActions = new List<InputActionState>();
+        var actionNames = new HashSet<string>();
+
+        foreach (var action in current.Actions)
+        {
+            actionNames.Add(action.ActionName);
+        }
+
+        if (baseline != null)
+        {
+            foreach (var action in baseline.Actions)
+            {
+                actionNames.Add(action.ActionName);
+            }
+        }
+
+        foreach (string actionName in actionNames)
+        {
+            float currentStrength = current.GetActionStrength(actionName);
+            float baselineStrength = baseline?.GetActionStrength(actionName) ?? 0;
+
+            if (currentStrength != baselineStrength)
+            {
+                changedActions.Add(new InputActionState(actionName, currentStrength));
+            }
+        }
+
+        return changedActions;
+    }
+
+    private static bool HasLookRotationChanged(PlayerController current, PlayerController baseline)
+    {
+        if (baseline == null)
+        {
+            return true;
+        }
+
+        return current.LookYaw != baseline.LookYaw
+            || current.LookPitch != baseline.LookPitch;
+    }
+}

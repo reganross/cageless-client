@@ -51,11 +51,52 @@ horizontal_alignment = 1
 custom_minimum_size = Vector2(0, 24)
 layout_mode = 2
 
-[node name="ConnectButton" type="Button" parent="Center/VBox"]
+[node name="StartButton" type="Button" parent="Center/VBox"]
 custom_minimum_size = Vector2(300, 52)
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
-text = "Connect to Server"
+text = "Start"
+
+[node name="StartMultiplayerButton" type="Button" parent="Center/VBox"]
+custom_minimum_size = Vector2(300, 52)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Start with Multiplayer"
+
+[node name="JoinPanel" type="VBoxContainer" parent="Center/VBox"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HostInput" type="LineEdit" parent="Center/VBox/JoinPanel"]
+custom_minimum_size = Vector2(300, 40)
+layout_mode = 2
+text = "71.91.25.119"
+placeholder_text = "IP Address"
+
+[node name="PortInput" type="SpinBox" parent="Center/VBox/JoinPanel"]
+custom_minimum_size = Vector2(300, 40)
+layout_mode = 2
+min_value = 1.0
+max_value = 65535.0
+value = 7777.0
+allow_greater = false
+allow_lesser = false
+prefix = "Port "
+
+[node name="JoinButton" type="Button" parent="Center/VBox/JoinPanel"]
+custom_minimum_size = Vector2(300, 52)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Join"
+
+[node name="StatusLabel" type="Label" parent="Center/VBox"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.55, 0.45, 1)
+theme_override_font_sizes/font_size = 14
+horizontal_alignment = 1
+autowrap_mode = 3
 
 [node name="ExitButton" type="Button" parent="Center/VBox"]
 custom_minimum_size = Vector2(300, 52)
@@ -63,5 +104,7 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "Exit"
 
-[connection signal="pressed" from="Center/VBox/ConnectButton" to="." method="_on_connect_pressed"]
+[connection signal="pressed" from="Center/VBox/StartButton" to="." method="_on_start_pressed"]
+[connection signal="pressed" from="Center/VBox/StartMultiplayerButton" to="." method="_on_start_multiplayer_pressed"]
+[connection signal="pressed" from="Center/VBox/JoinPanel/JoinButton" to="." method="_on_join_pressed"]
 [connection signal="pressed" from="Center/VBox/ExitButton" to="." method="_on_exit_pressed"]

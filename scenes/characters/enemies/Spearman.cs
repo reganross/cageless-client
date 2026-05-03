@@ -1,7 +1,7 @@
 using Godot;
 using System;
 
-public partial class Spearman : CharacterBody3D
+public partial class Spearman : CharacterBody3D, INetworkEntity
 {
 	[Signal]
 	public delegate void DefeatedEventHandler();
@@ -24,14 +24,37 @@ public partial class Spearman : CharacterBody3D
 	[Export]
 	public float RemoveAfterDeathSeconds { get; set; } = 2f;
 
+	[Export]
+	public float SnapshotPositionLerpSpeed { get; set; } = 12f;
+
+	[Export]
+	public float SnapshotRotationLerpSpeed { get; set; } = 12f;
+
+	[Export]
+	public float SnapshotFloorY { get; set; } = 0.25f;
+
 	private AnimationPlayer _animationPlayer;
 	private Node3D _player;
+	private ClientSnapshotTruthLayer _truthLayer;
+	private int _networkEntityId;
+	private EntityId _entityId;
 	private bool _aware;
 	private bool _dead;
+
+	public EntityId Id => _entityId;
 
 	public override void _Ready()
 	{
 		_animationPlayer = GetNodeOrNull<AnimationPlayer>("AnimationPlayer");
+	}
+
+	public override void _ExitTree()
+	{
+		if (_entityId.Value != 0 && NetworkSession.ServerHost != null)
+		{
+			NetworkSession.ServerHost.Server.DeregisterEntity(_entityId);
+			_entityId = default;
+		}
 	}
 
 	public void Die()
@@ -67,9 +90,47 @@ public partial class Spearman : CharacterBody3D
 		QueueFree();
 	}
 
+	public void UseTruthLayer(int entityId, ClientSnapshotTruthLayer truthLayer)
+	{
+		_networkEntityId = entityId;
+		_truthLayer = truthLayer ?? throw new ArgumentNullException(nameof(truthLayer));
+	}
+
+	public void AssignEntityId(EntityId entityId)
+	{
+		_entityId = entityId;
+	}
+
+	public EntityState CaptureState()
+	{
+		var snapshotPosition = GlobalPosition;
+		if (snapshotPosition.Y < SnapshotFloorY)
+		{
+			snapshotPosition.Y = SnapshotFloorY;
+		}
+
+		return new EntityState
+		{
+			TypeId = (int)NetworkEntityType.Spearman,
+			Position = snapshotPosition,
+			Rotation = Quaternion.FromEuler(Rotation),
+			Velocity = Velocity,
+			StateFlags = _dead ? 1 : 0
+		};
+	}
+
 	public override void _PhysicsProcess(double delta)
 	{
 		if (_dead)
+			return;
+
+		_truthLayer?.TryApplyTruth(
+			_networkEntityId,
+			this,
+			delta,
+			SnapshotPositionLerpSpeed,
+			SnapshotRotationLerpSpeed);
+		if (_truthLayer != null)
 			return;
 
 		float dt = (float)delta;

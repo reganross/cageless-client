@@ -57,7 +57,7 @@ public class NetworkClient : System.IDisposable
 
         ClientId = clientId;
         Controller = new PlayerController(clientId, tick: 0);
-        lastSentController = CopyController(Controller, tick: 0);
+        lastSentController = CopyController(Controller, new Tick(0));
         if (ownsClockAdvancement)
         {
             tickClock.Reset();
@@ -80,6 +80,20 @@ public class NetworkClient : System.IDisposable
         return SendFullControllerPacket(tickClock.CurrentTick);
     }
 
+    public bool SendAttackCommand()
+    {
+        if (!IsConnected)
+        {
+            return false;
+        }
+
+        var payload = AttackCommandSerializer.Serialize(new AttackCommandPacket(
+            ClientId,
+            tickClock.CurrentTick));
+        transport.Send(CreatePayloadPacket(ClientPacketKind.Attack, payload));
+        return true;
+    }
+
     public int Tick(double deltaSeconds)
     {
         if (!IsConnected || ownedAdvancer == null)
@@ -99,7 +113,7 @@ public class NetworkClient : System.IDisposable
         }
 
         int sent = 0;
-        while (tickCursor.TryRequestTick(out int tick))
+        while (tickCursor.TryRequestTick(out Tick tick))
         {
             Controller.SetTick(tick);
 
@@ -230,9 +244,9 @@ public class NetworkClient : System.IDisposable
         transport.Dispose();
     }
 
-    private bool ProcessControllerTick(int tick)
+    private bool ProcessControllerTick(Tick tick)
     {
-        if (tick % FullControllerIntervalTicks == 0)
+        if (tick.Value % FullControllerIntervalTicks == 0)
         {
             return SendFullControllerPacket(tick);
         }
@@ -259,7 +273,7 @@ public class NetworkClient : System.IDisposable
         return true;
     }
 
-    private bool SendFullControllerPacket(int tick)
+    private bool SendFullControllerPacket(Tick tick)
     {
         var snapshot = CopyController(Controller, tick);
         SendControllerCommand(new ClientCommandPacket(
@@ -308,7 +322,7 @@ public class NetworkClient : System.IDisposable
         return stream.ToArray();
     }
 
-    private static PlayerController CopyController(PlayerController source, int tick)
+    private static PlayerController CopyController(PlayerController source, Tick tick)
     {
         var copy = new PlayerController(source.PlayerId, tick, source.Actions);
         copy.SetLookRotation(source.LookYaw, source.LookPitch);

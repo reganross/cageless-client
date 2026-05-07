@@ -23,7 +23,7 @@ public class NetworkTickClockTests
         var completed = advancer.Advance(0.049);
 
         Assert.Equal(0, completed);
-        Assert.Equal(0, clock.CurrentTick);
+        Assert.Equal(new Tick(0), clock.CurrentTick);
         Assert.Equal(0, clock.PendingTicks);
     }
 
@@ -48,7 +48,7 @@ public class NetworkTickClockTests
         var completed = advancer.Advance(0.05);
 
         Assert.Equal(1, completed);
-        Assert.Equal(1, clock.CurrentTick);
+        Assert.Equal(new Tick(1), clock.CurrentTick);
         Assert.Equal(1, clock.PendingTicks);
     }
 
@@ -74,7 +74,7 @@ public class NetworkTickClockTests
         Assert.Equal(0, advancer.Advance(0.02));
         Assert.Equal(1, advancer.Advance(0.01));
 
-        Assert.Equal(1, clock.CurrentTick);
+        Assert.Equal(new Tick(1), clock.CurrentTick);
         Assert.Equal(1, clock.PendingTicks);
     }
 
@@ -99,7 +99,7 @@ public class NetworkTickClockTests
         var completed = advancer.Advance(0.16);
 
         Assert.Equal(3, completed);
-        Assert.Equal(3, clock.CurrentTick);
+        Assert.Equal(new Tick(3), clock.CurrentTick);
         Assert.Equal(3, clock.PendingTicks);
     }
 
@@ -127,9 +127,9 @@ public class NetworkTickClockTests
         Assert.True(clock.TryRequestTick(out var third));
         Assert.False(clock.TryRequestTick(out _));
 
-        Assert.Equal(1, first);
-        Assert.Equal(2, second);
-        Assert.Equal(3, third);
+        Assert.Equal(new Tick(1), first);
+        Assert.Equal(new Tick(2), second);
+        Assert.Equal(new Tick(3), third);
         Assert.Equal(0, clock.PendingTicks);
     }
 
@@ -163,10 +163,10 @@ public class NetworkTickClockTests
         Assert.True(secondConsumer.TryRequestTick(out var mirroredSecondTick));
         Assert.False(secondConsumer.TryRequestTick(out _));
 
-        Assert.Equal(1, firstTick);
-        Assert.Equal(2, secondTick);
-        Assert.Equal(1, mirroredFirstTick);
-        Assert.Equal(2, mirroredSecondTick);
+        Assert.Equal(new Tick(1), firstTick);
+        Assert.Equal(new Tick(2), secondTick);
+        Assert.Equal(new Tick(1), mirroredFirstTick);
+        Assert.Equal(new Tick(2), mirroredSecondTick);
     }
 
     /*

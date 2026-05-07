@@ -16,7 +16,7 @@ public static class ClientCommandSerializer
         writer.Write((int)packet.Kind);
         writer.Write((int)packet.ControllerPacketKind);
         writer.Write(packet.Controller.PlayerId.Value);
-        writer.Write(packet.Controller.Tick);
+        writer.Write(packet.Controller.Tick.Value);
         writer.Write(packet.HasLookRotation);
 
         if (packet.HasLookRotation)
@@ -56,7 +56,7 @@ public static class ClientCommandSerializer
             }
 
             var playerId = new ClientId(reader.ReadInt32());
-            int tick = reader.ReadInt32();
+            var tick = new Tick(reader.ReadInt32());
             bool hasLookRotation = reader.ReadBoolean();
             float lookYaw = 0;
             float lookPitch = 0;

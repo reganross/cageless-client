@@ -38,7 +38,6 @@ public partial class CombatWaveManager : Node3D
 	private SceneNodeSpawner _sceneNodeSpawner;
 	private Playercharacter _localPlayer;
 	private bool _localPlayerHasTruthLayer;
-	private double _snapshotLogSeconds;
 
 	public override void _Ready()
 	{
@@ -51,7 +50,10 @@ public partial class CombatWaveManager : Node3D
 		AddChild(_replicatedEntities);
 
 		if (NetworkSession.TickClock == null)
-			NetworkSession.StartSinglePlayer();
+			NetworkSession.StartLocalPlay();
+
+		if (NetworkSession.ServerHost != null)
+			NetworkSession.ServerHost.Server.SyncAuthoritativePlayerSpawn(PlayerSpawnPosition);
 
 		ConfigureReplication();
 		SpawnPlayer();
@@ -84,7 +86,12 @@ public partial class CombatWaveManager : Node3D
 		_localPlayer.UseTickClockAdvancer(NetworkSession.TickClockAdvancer);
 
 		if (NetworkSession.Client != null)
-			_localPlayer.UseController(NetworkSession.Client.Controller, usesLocalInput: true);
+		{
+			_localPlayer.UseController(
+				NetworkSession.Client.Controller,
+				usesLocalInput: true,
+				simulatesFromController: false);
+		}
 
 		AddChild(_localPlayer);
 		_localPlayer.GlobalPosition = PlayerSpawnPosition;
@@ -94,12 +101,11 @@ public partial class CombatWaveManager : Node3D
 	{
 		NetworkSession.Tick(delta);
 		ApplyReceivedSnapshots();
-		PrintSnapshotEntitiesOncePerSecond(delta);
 	}
 
 	public override void _ExitTree()
 	{
-		if (NetworkSession.Mode == NetworkSessionMode.SinglePlayer)
+		if (NetworkSession.Mode != NetworkSessionMode.Disconnected)
 			NetworkSession.Reset();
 	}
 
@@ -240,56 +246,5 @@ public partial class CombatWaveManager : Node3D
 
 		_localPlayer.UseTruthLayer(entityId, _truthLayer);
 		_localPlayerHasTruthLayer = true;
-	}
-
-	private void PrintSnapshotEntitiesOncePerSecond(double delta)
-	{
-		_snapshotLogSeconds += delta;
-		if (_snapshotLogSeconds < 1.0)
-			return;
-
-		_snapshotLogSeconds = 0;
-
-		if (NetworkSession.ServerHost != null)
-		{
-			PrintSnapshotEntities("server", NetworkSession.ServerHost.Server.GetLatestSnapshot());
-		}
-
-		if (NetworkSession.Client != null)
-		{
-			PrintEntityStates(
-				"client cache",
-				NetworkSession.Client.LatestEntityStates);
-		}
-	}
-
-	private static void PrintSnapshotEntities(string source, SnapshotFrame snapshot)
-	{
-		if (snapshot.States == null)
-		{
-			GD.Print($"Snapshot {source}: no snapshot yet.");
-			return;
-		}
-
-		GD.Print($"Snapshot {source}: tick={snapshot.Tick}, entities={snapshot.States.Count}");
-		foreach (var kv in snapshot.States)
-		{
-			var state = kv.Value;
-			GD.Print(
-				$"  entity={kv.Key} type={(NetworkEntityType)state.TypeId} owner={state.OwnerId} position={state.Position}");
-		}
-	}
-
-	private static void PrintEntityStates(
-		string source,
-		System.Collections.Generic.IReadOnlyDictionary<int, EntityState> states)
-	{
-		GD.Print($"Snapshot {source}: entities={states.Count}");
-		foreach (var kv in states)
-		{
-			var state = kv.Value;
-			GD.Print(
-				$"  entity={kv.Key} type={(NetworkEntityType)state.TypeId} owner={state.OwnerId} position={state.Position}");
-		}
 	}
 }

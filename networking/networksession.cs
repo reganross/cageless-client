@@ -1,8 +1,9 @@
 using System;
+using System.Collections.Generic;
 
 public enum NetworkSessionMode
 {
-    SinglePlayer,
+    Disconnected,
     Host,
     Client
 }
@@ -12,7 +13,7 @@ public static class NetworkSession
     public const string DefaultHost = "71.91.25.119";
     public const int DefaultPort = 7777;
 
-    public static NetworkSessionMode Mode { get; private set; } = NetworkSessionMode.SinglePlayer;
+    public static NetworkSessionMode Mode { get; private set; } = NetworkSessionMode.Disconnected;
     public static NetworkTickClock TickClock { get; private set; }
     public static NetworkTickClock.Advancer TickClockAdvancer { get; private set; }
     public static NetworkServerHost ServerHost { get; private set; }
@@ -20,12 +21,23 @@ public static class NetworkSession
 
     public static bool HasNetwork => ServerHost != null || Client != null;
 
-    public static void StartSinglePlayer()
+    /// <summary>
+    /// Offline / local play: same Host + Client processing as multiplayer, without UDP.
+    /// </summary>
+    public static void StartLocalPlay()
     {
         Reset();
-        Mode = NetworkSessionMode.SinglePlayer;
+        Mode = NetworkSessionMode.Host;
         TickClock = new NetworkTickClock();
         TickClockAdvancer = TickClock.CreateAdvancer();
+
+        var serverIngress = new Queue<byte[]>();
+        var clientIngress = new Queue<byte[]>();
+        var serverTransport = new LoopbackServerTransport(serverIngress, clientIngress);
+        ServerHost = NetworkServerHost.Start(serverTransport, port: 0, TickClock);
+
+        Client = new NetworkClient(new LoopbackClientTransport(serverIngress, clientIngress), TickClock);
+        Client.Connect(CreateClientId());
     }
 
     public static void StartHost(int port = DefaultPort)
@@ -72,7 +84,7 @@ public static class NetworkSession
         TickClockAdvancer?.Dispose();
         TickClockAdvancer = null;
         TickClock = null;
-        Mode = NetworkSessionMode.SinglePlayer;
+        Mode = NetworkSessionMode.Disconnected;
     }
 
     private static ClientId CreateClientId()

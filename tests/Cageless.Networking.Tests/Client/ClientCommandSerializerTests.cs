@@ -37,7 +37,7 @@ public class ClientCommandSerializerTests
         var deserialized = ClientCommandSerializer.Deserialize(bytes);
 
         Assert.Equal(new ClientId(3), deserialized.ClientId);
-        Assert.Equal(12, deserialized.Tick);
+        Assert.Equal(new Tick(12), deserialized.Tick);
         Assert.Equal(ControllerPacketKind.Full, deserialized.ControllerPacketKind);
         Assert.Equal(ClientCommandKind.Controller, deserialized.Kind);
         Assert.Equal(1, deserialized.Controller.GetActionStrength("right"));
@@ -76,7 +76,7 @@ public class ClientCommandSerializerTests
             ClientCommandSerializer.Serialize(packet));
 
         Assert.Equal(new ClientId(9), deserialized.ClientId);
-        Assert.Equal(44, deserialized.Tick);
+        Assert.Equal(new Tick(44), deserialized.Tick);
     }
 
     /*

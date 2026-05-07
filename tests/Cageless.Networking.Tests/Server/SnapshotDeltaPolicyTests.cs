@@ -105,7 +105,7 @@ public class SnapshotDeltaPolicyTests
         Assert.Equal(2, packet.Frame.States[7].StateFlags);
     }
 
-    private static SnapshotFrame CreateFrame(long tick, Vector3 position, int stateFlags = 0)
+    private static SnapshotFrame CreateFrame(Tick tick, Vector3 position, int stateFlags = 0)
     {
         return new SnapshotFrame
         {

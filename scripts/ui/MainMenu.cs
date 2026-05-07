@@ -21,7 +21,7 @@ public partial class MainMenu : Control
 
 	public void _on_start_pressed()
 	{
-		NetworkSession.StartSinglePlayer();
+		NetworkSession.StartLocalPlay();
 		LoadCombatScene();
 	}
 

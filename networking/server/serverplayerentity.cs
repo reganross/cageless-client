@@ -3,15 +3,27 @@ using Godot;
 public sealed class ServerPlayerEntity : INetworkEntity
 {
     private const float MoveSpeed = 5f;
+    private const string PlayerScenePath = "res://scenes/characters/playercharacter.tscn";
+    private static GodotCollisionRigSampler collisionRigSampler;
 
     private EntityId id;
     private Vector3 position;
     private Vector3 velocity;
     private Quaternion rotation = Quaternion.Identity;
 
-    public ServerPlayerEntity(ClientId ownerId)
+    public ServerPlayerEntity(ClientId ownerId, Vector3 initialPosition = default)
     {
         OwnerId = ownerId;
+        position = initialPosition;
+    }
+
+    /// <summary>
+    /// Snap authoritative physics pose (e.g. scene spawn); clears residual velocity.
+    /// </summary>
+    public void ResetToSpawn(Vector3 worldPosition)
+    {
+        position = worldPosition;
+        velocity = Vector3.Zero;
     }
 
     public EntityId Id => id;
@@ -49,5 +61,11 @@ public sealed class ServerPlayerEntity : INetworkEntity
             Rotation = rotation,
             Velocity = velocity
         };
+    }
+
+    public CollisionRigSnapshot GetCollisionRig(EntityState state)
+    {
+        collisionRigSampler ??= GodotCollisionRigSampler.FromScenePath(PlayerScenePath);
+        return collisionRigSampler.Sample(state);
     }
 }

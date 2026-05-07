@@ -4,22 +4,32 @@ using Godot;
 public class PlayerController
 {
     private readonly Dictionary<string, float> actionStrengths = new();
-    private int tick;
+    private Tick tick;
 
     public PlayerController(int tick = 0)
+        : this(new Tick(tick))
+    {
+    }
+
+    public PlayerController(Tick tick)
     {
         this.tick = tick;
         HasPlayerId = false;
     }
 
     public PlayerController(ClientId playerId, int tick)
+        : this(playerId, new Tick(tick))
+    {
+    }
+
+    public PlayerController(ClientId playerId, Tick tick)
         : this(playerId, tick, new List<InputActionState>())
     {
     }
 
     public PlayerController(
         ClientId playerId,
-        int tick,
+        Tick tick,
         IEnumerable<InputActionState> actions)
     {
         PlayerId = playerId;
@@ -34,7 +44,7 @@ public class PlayerController
 
     public bool HasPlayerId { get; }
     public ClientId PlayerId { get; }
-    public int Tick => tick;
+    public Tick Tick => tick;
     public float LookYaw { get; private set; }
     public float LookPitch { get; private set; }
     public IReadOnlyList<InputActionState> Actions
@@ -62,9 +72,14 @@ public class PlayerController
         LookPitch = pitch;
     }
 
-    public void SetTick(int tick)
+    public void SetTick(Tick tick)
     {
         this.tick = tick;
+    }
+
+    public void SetTick(int tick)
+    {
+        SetTick(new Tick(tick));
     }
 
     public void ApplySnapshot(PlayerController snapshot)

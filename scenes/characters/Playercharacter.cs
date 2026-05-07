@@ -34,6 +34,7 @@ public partial class Playercharacter : CharacterBody3D
 	private NetworkTickClock.Advancer _tickClockAdvancer;
 	private ClientSnapshotTruthLayer _truthLayer;
 	private bool _usesLocalInput = true;
+	private bool _simulatesFromController = true;
 	private int _networkEntityId;
 	private float _pitch;
 	/// <summary>Extra yaw on <see cref="_cameraPivot"/> so look direction can lead the body.</summary>
@@ -84,7 +85,10 @@ public partial class Playercharacter : CharacterBody3D
 		if (e is InputEventMouseButton attackClick && attackClick.Pressed && attackClick.ButtonIndex == MouseButton.Left)
 		{
 			if (TryPlaySpearThrust())
+			{
+				NetworkSession.Client?.SendAttackCommand();
 				GetViewport().SetInputAsHandled();
+			}
 			return;
 		}
 
@@ -110,13 +114,25 @@ public partial class Playercharacter : CharacterBody3D
 
 	public void UseController(PlayerController controller)
 	{
-		UseController(controller, usesLocalInput: !controller.HasPlayerId);
+		UseController(
+			controller,
+			usesLocalInput: !controller.HasPlayerId,
+			simulatesFromController: true);
 	}
 
 	public void UseController(PlayerController controller, bool usesLocalInput)
 	{
+		UseController(controller, usesLocalInput, simulatesFromController: true);
+	}
+
+	public void UseController(
+		PlayerController controller,
+		bool usesLocalInput,
+		bool simulatesFromController)
+	{
 		_controller = controller ?? throw new ArgumentNullException(nameof(controller));
 		_usesLocalInput = usesLocalInput;
+		_simulatesFromController = simulatesFromController;
 		_pitch = controller.LookPitch;
 		_yawOffset = Mathf.AngleDifference(Rotation.Y, controller.LookYaw);
 	}
@@ -137,12 +153,30 @@ public partial class Playercharacter : CharacterBody3D
 		if (_usesLocalInput)
 			_tickClockAdvancer?.Advance(delta);
 
-		_truthLayer?.TryApplyTruth(
-			_networkEntityId,
-			this,
-			delta,
-			SnapshotPositionLerpSpeed,
-			SnapshotRotationLerpSpeed);
+		bool snapshotApplied = false;
+		if (_truthLayer != null)
+		{
+			snapshotApplied = _truthLayer.TryApplyTruth(
+				_networkEntityId,
+				this,
+				delta,
+				SnapshotPositionLerpSpeed,
+				SnapshotRotationLerpSpeed);
+		}
+
+		// Snapshot lerps body yaw toward the server every frame; mouse drives LookYaw on the
+		// controller. Without re-syncing pivot offset, world view rotates as the body catches up.
+		if (snapshotApplied
+			&& !_simulatesFromController
+			&& _usesLocalInput
+			&& _cameraPivot != null)
+		{
+			_yawOffset = Mathf.AngleDifference(Rotation.Y, _controller.LookYaw);
+			_cameraPivot.Rotation = new Vector3(_controller.LookPitch, _yawOffset, 0);
+		}
+
+		if (!_simulatesFromController)
+			return;
 
 		float dt = (float)delta;
 		TurnTowardControllerLook(dt);

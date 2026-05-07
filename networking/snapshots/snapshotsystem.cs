@@ -13,12 +13,12 @@ public class SnapshotSystem
         frames = new SnapshotFrame[historySize];
     }
 
-    public void Capture(long tick)
+    public void Capture(Tick tick)
     {
         var frame = new SnapshotFrame
         {
             Tick = tick,
-            States = new Dictionary<int, EntityState>()
+            States = new Dictionary<Tick, EntityState>()
         };
 
         foreach (var kv in registry.All)
@@ -29,6 +29,11 @@ public class SnapshotSystem
 
         frames[index] = frame;
         index = (index + 1) % frames.Length;
+    }
+
+    public void Capture(int tick)
+    {
+        Capture(new Tick(tick));
     }
 
     public SnapshotFrame GetLatest()

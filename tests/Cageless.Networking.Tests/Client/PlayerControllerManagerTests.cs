@@ -81,7 +81,7 @@ public class PlayerControllerManagerTests
 
         Assert.True(applied);
         Assert.Same(stored, manager.GetOrCreate(playerId));
-        Assert.Equal(2, stored.Tick);
+        Assert.Equal(new Tick(2), stored.Tick);
         Assert.Equal(1, stored.GetActionStrength("forward"));
         Assert.Equal(1.5f, stored.LookYaw);
         Assert.Equal(-0.25f, stored.LookPitch);
@@ -181,7 +181,7 @@ public class PlayerControllerManagerTests
             delta);
 
         Assert.True(manager.Apply(command));
-        Assert.Equal(2, stored.Tick);
+        Assert.Equal(new Tick(2), stored.Tick);
         Assert.Equal(1, stored.GetActionStrength("forward"));
         Assert.Equal(1, stored.GetActionStrength("right"));
         Assert.Equal(0.5f, stored.LookYaw);

@@ -22,8 +22,8 @@ public class SnapshotBufferTests
         buffer.AddSnapshot(new SnapshotFrame { Tick = 100 });
         buffer.AddSnapshot(new SnapshotFrame { Tick = 101 });
 
-        Assert.Equal(101, buffer.Get(0).Tick);
-        Assert.Equal(100, buffer.Get(1).Tick);
+        Assert.Equal(new Tick(101), buffer.Get(0).Tick);
+        Assert.Equal(new Tick(100), buffer.Get(1).Tick);
     }
 
     /*
@@ -48,9 +48,9 @@ public class SnapshotBufferTests
         buffer.AddSnapshot(new SnapshotFrame { Tick = 102 });
         buffer.AddSnapshot(new SnapshotFrame { Tick = 103 });
 
-        Assert.Equal(103, buffer.Get(0).Tick);
-        Assert.Equal(102, buffer.Get(1).Tick);
-        Assert.Equal(101, buffer.Get(2).Tick);
+        Assert.Equal(new Tick(103), buffer.Get(0).Tick);
+        Assert.Equal(new Tick(102), buffer.Get(1).Tick);
+        Assert.Equal(new Tick(101), buffer.Get(2).Tick);
     }
 
     /*

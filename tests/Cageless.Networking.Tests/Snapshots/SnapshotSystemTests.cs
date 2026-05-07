@@ -32,7 +32,7 @@ public class SnapshotSystemTests
         snapshotSystem.Capture(tick: 42);
 
         var frame = snapshotSystem.GetLatest();
-        Assert.Equal(42, frame.Tick);
+        Assert.Equal(new Tick(42), frame.Tick);
         Assert.True(frame.States.ContainsKey(entityId.Value));
         Assert.Equal(entity.CaptureState().Position, frame.States[entityId.Value].Position);
         Assert.Equal(entity.CaptureState().Rotation, frame.States[entityId.Value].Rotation);
@@ -100,8 +100,8 @@ public class SnapshotSystemTests
         };
         snapshotSystem.Capture(tick: 101);
 
-        Assert.Equal(101, snapshotSystem.Get(0).Tick);
-        Assert.Equal(100, snapshotSystem.Get(1).Tick);
+        Assert.Equal(new Tick(101), snapshotSystem.Get(0).Tick);
+        Assert.Equal(new Tick(100), snapshotSystem.Get(1).Tick);
     }
 
     private sealed class TestNetworkEntity : INetworkEntity
@@ -116,5 +116,7 @@ public class SnapshotSystemTests
         public EntityId Id { get; } = new(0);
 
         public EntityState CaptureState() => State;
+
+        public CollisionRigSnapshot GetCollisionRig() => new();
     }
 }

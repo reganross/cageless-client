@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
 using System.Net;
 using System.Net.Sockets;
 
@@ -52,32 +51,14 @@ public class UdpServerTransport : IServerNetworkTransport
         byte[] bytes,
         IPEndPoint remoteEndPoint)
     {
-        try
-        {
-            using var stream = new MemoryStream(bytes);
-            using var reader = new BinaryReader(stream);
-
-            var kind = (ClientPacketKind)reader.ReadInt32();
-            switch (kind)
-            {
-                case ClientPacketKind.Connect:
-                    return ProcessConnect(server, reader, remoteEndPoint);
-                case ClientPacketKind.Controller:
-                    return ProcessController(server, reader, remoteEndPoint);
-                case ClientPacketKind.Disconnect:
-                    return ProcessDisconnect(server, reader);
-                default:
-                    return false;
-            }
-        }
-        catch (EndOfStreamException)
-        {
-            return false;
-        }
-        catch (InvalidDataException)
-        {
-            return false;
-        }
+        return ServerPacketIngress.ProcessClientPacket(
+            server,
+            this,
+            clientEndpoints.TryGetValue,
+            RegisterClientEndpoint,
+            UnregisterClientEndpoint,
+            bytes,
+            remoteEndPoint);
     }
 
     public void SendSnapshot(ClientId clientId, SnapshotPacket packet)
@@ -95,52 +76,5 @@ public class UdpServerTransport : IServerNetworkTransport
     {
         udpClient?.Dispose();
         udpClient = null;
-    }
-
-    private bool ProcessConnect(
-        NetworkServer server,
-        BinaryReader reader,
-        IPEndPoint remoteEndPoint)
-    {
-        var clientId = new ClientId(reader.ReadInt32());
-        if (!server.ConnectClient(clientId))
-        {
-            return false;
-        }
-
-        RegisterClientEndpoint(clientId, remoteEndPoint);
-        server.FlushSnapshots(this);
-        return true;
-    }
-
-    private bool ProcessController(
-        NetworkServer server,
-        BinaryReader reader,
-        IPEndPoint remoteEndPoint)
-    {
-        int payloadLength = reader.ReadInt32();
-        if (payloadLength < 0)
-        {
-            return false;
-        }
-
-        var command = ClientCommandSerializer.Deserialize(reader.ReadBytes(payloadLength));
-        if (!clientEndpoints.TryGetValue(command.ClientId, out var registeredEndpoint)
-            || !registeredEndpoint.Equals(remoteEndPoint))
-        {
-            return false;
-        }
-
-        return server.ReceiveCommand(command);
-    }
-
-    private bool ProcessDisconnect(
-        NetworkServer server,
-        BinaryReader reader)
-    {
-        var clientId = new ClientId(reader.ReadInt32());
-        UnregisterClientEndpoint(clientId);
-        server.DisconnectClient(clientId);
-        return true;
     }
 }

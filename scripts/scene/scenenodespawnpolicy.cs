@@ -15,7 +15,6 @@ public static class SceneNodeSpawnPolicy
             return true;
         }
 
-        return mode == NetworkSessionMode.SinglePlayer
-            || mode == NetworkSessionMode.Host;
+        return mode == NetworkSessionMode.Host;
     }
 }

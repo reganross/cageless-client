@@ -15,7 +15,7 @@ public class SceneNodeSpawnPolicyTests
      - Scene setup may become coupled to network authority unnecessarily
     */
     [Theory]
-    [InlineData(NetworkSessionMode.SinglePlayer)]
+    [InlineData(NetworkSessionMode.Disconnected)]
     [InlineData(NetworkSessionMode.Host)]
     [InlineData(NetworkSessionMode.Client)]
     public void CanSpawn_ShouldAllowStaticNodesInEveryMode(NetworkSessionMode mode)
@@ -28,23 +28,34 @@ public class SceneNodeSpawnPolicyTests
 
     /*
      PURPOSE:
-     Ensure single-player scenes can create gameplay entities locally.
+     Ensure host-mode sessions can create gameplay entities locally.
 
      DESIGN RULE:
-     - No-network sessions own their local simulation
-     - Local scene scripts may create gameplay entities in single-player
+     - Host owns authoritative simulation (including offline loopback host)
+     - Local scene scripts may create gameplay entities only when hosting
 
      FAILURE MEANS:
-     - Single-player combat may stop spawning players or enemies
-     - Entity spawning may require networking even when offline
+     - Host combat may stop spawning players or enemies
+     - Offline play may incorrectly run without server authority
     */
     [Fact]
-    public void CanSpawn_ShouldAllowLocalEntityInSinglePlayer()
+    public void CanSpawn_ShouldAllowLocalEntityWhenHost()
     {
         Assert.True(SceneNodeSpawnPolicy.CanSpawn(
             SceneNodeSpawnKind.Entity,
             SceneNodeSpawnSource.LocalScene,
-            NetworkSessionMode.SinglePlayer));
+            NetworkSessionMode.Host));
+    }
+
+    [Theory]
+    [InlineData(SceneNodeSpawnSource.LocalScene)]
+    [InlineData(SceneNodeSpawnSource.ServerSimulation)]
+    public void CanSpawn_ShouldRejectDisconnectedLocalEntitySpawns(SceneNodeSpawnSource source)
+    {
+        Assert.False(SceneNodeSpawnPolicy.CanSpawn(
+            SceneNodeSpawnKind.Entity,
+            source,
+            NetworkSessionMode.Disconnected));
     }
 
     /*
@@ -106,7 +117,7 @@ public class SceneNodeSpawnPolicyTests
      - Snapshot replication may be unable to populate scenes
     */
     [Theory]
-    [InlineData(NetworkSessionMode.SinglePlayer)]
+    [InlineData(NetworkSessionMode.Disconnected)]
     [InlineData(NetworkSessionMode.Host)]
     [InlineData(NetworkSessionMode.Client)]
     public void CanSpawn_ShouldAllowEntityFromServerSnapshot(NetworkSessionMode mode)

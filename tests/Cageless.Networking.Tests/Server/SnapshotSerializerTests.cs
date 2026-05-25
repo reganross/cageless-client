@@ -110,7 +110,7 @@ public class SnapshotSerializerTests
 
         var deserialized = SnapshotSerializer.Deserialize(bytes);
 
-        Assert.Equal(42, deserialized.Tick);
+        Assert.Equal(new Tick(42), deserialized.Tick);
         Assert.Empty(deserialized.States);
     }
 
@@ -149,7 +149,7 @@ public class SnapshotSerializerTests
 
         var deserialized = SnapshotSerializer.Deserialize(bytes);
 
-        Assert.Equal(42, deserialized.Tick);
+        Assert.Equal(new Tick(42), deserialized.Tick);
         Assert.True(deserialized.States.ContainsKey(7));
         Assert.Equal((int)NetworkEntityType.Player, deserialized.States[7].TypeId);
         Assert.Equal(3, deserialized.States[7].OwnerId);
@@ -248,7 +248,7 @@ public class SnapshotSerializerTests
         var deserialized = SnapshotSerializer.DeserializePacket(bytes);
 
         Assert.Equal(SnapshotPacketKind.Delta, deserialized.Kind);
-        Assert.Equal(42, deserialized.Frame.Tick);
+        Assert.Equal(new Tick(42), deserialized.Frame.Tick);
         Assert.Equal(2, deserialized.Frame.States.Count);
         Assert.Equal(new Vector3(4, 5, 6), deserialized.Frame.States[12].Position);
     }

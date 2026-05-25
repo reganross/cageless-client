@@ -36,6 +36,7 @@ public partial class Spearman : CharacterBody3D, INetworkEntity
 	private AnimationPlayer _animationPlayer;
 	private Node3D _player;
 	private ClientSnapshotTruthLayer _truthLayer;
+	private GodotCollisionRigSampler _collisionRigSampler;
 	private int _networkEntityId;
 	private EntityId _entityId;
 	private bool _aware;
@@ -50,6 +51,9 @@ public partial class Spearman : CharacterBody3D, INetworkEntity
 
 	public override void _ExitTree()
 	{
+		_collisionRigSampler?.Dispose();
+		_collisionRigSampler = null;
+
 		if (_entityId.Value != 0 && NetworkSession.ServerHost != null)
 		{
 			NetworkSession.ServerHost.Server.DeregisterEntity(_entityId);
@@ -109,14 +113,35 @@ public partial class Spearman : CharacterBody3D, INetworkEntity
 			snapshotPosition.Y = SnapshotFloorY;
 		}
 
+		string animationName = null;
+		double animationTime = 0d;
+		bool animationPlaying = false;
+		if (_animationPlayer != null
+			&& _animationPlayer.IsPlaying()
+			&& !string.IsNullOrEmpty(_animationPlayer.CurrentAnimation))
+		{
+			animationPlaying = true;
+			animationName = _animationPlayer.CurrentAnimation;
+			animationTime = _animationPlayer.CurrentAnimationPosition;
+		}
+
 		return new EntityState
 		{
 			TypeId = (int)NetworkEntityType.Spearman,
 			Position = snapshotPosition,
 			Rotation = Quaternion.FromEuler(Rotation),
 			Velocity = Velocity,
+			AnimationName = animationName,
+			AnimationTime = animationTime,
+			IsAnimationPlaying = animationPlaying,
 			StateFlags = _dead ? 1 : 0
 		};
+	}
+
+	public CollisionRigSnapshot GetCollisionRig(EntityState state)
+	{
+		_collisionRigSampler ??= GodotCollisionRigSampler.FromInstance(this);
+		return _collisionRigSampler.Sample(state);
 	}
 
 	public override void _PhysicsProcess(double delta)

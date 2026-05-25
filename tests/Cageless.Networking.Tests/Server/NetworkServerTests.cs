@@ -32,7 +32,7 @@ public class NetworkServerTests
         server.RecordSnapshot(tick: 42);
 
         var snapshot = server.GetLatestSnapshot();
-        Assert.Equal(42, snapshot.Tick);
+        Assert.Equal(new Tick(42), snapshot.Tick);
         Assert.True(snapshot.States.ContainsKey(entityId.Value));
         Assert.Equal(entity.CaptureState().Position, snapshot.States[entityId.Value].Position);
     }
@@ -84,7 +84,7 @@ public class NetworkServerTests
         server.QueueLatestSnapshot();
 
         Assert.True(server.TryDequeueSnapshot(clientId, out var snapshot));
-        Assert.Equal(42, snapshot.Tick);
+        Assert.Equal(new Tick(42), snapshot.Tick);
     }
 
     /*
@@ -113,8 +113,8 @@ public class NetworkServerTests
 
         Assert.True(server.TryDequeueSnapshot(firstClient, out var firstSnapshot));
         Assert.True(server.TryDequeueSnapshot(secondClient, out var secondSnapshot));
-        Assert.Equal(42, firstSnapshot.Tick);
-        Assert.Equal(42, secondSnapshot.Tick);
+        Assert.Equal(new Tick(42), firstSnapshot.Tick);
+        Assert.Equal(new Tick(42), secondSnapshot.Tick);
     }
 
     /*
@@ -320,7 +320,7 @@ public class NetworkServerTests
 
         Assert.True(server.TryDequeueSnapshotPacket(new ClientId(1), out var packet));
         Assert.Equal(SnapshotPacketKind.Full, packet.Kind);
-        Assert.Equal(42, packet.Frame.Tick);
+        Assert.Equal(new Tick(42), packet.Frame.Tick);
         Assert.Equal(2, packet.Frame.States.Count);
     }
 
@@ -347,7 +347,7 @@ public class NetworkServerTests
 
         var sentSnapshot = Assert.Single(transport.SentSnapshots);
         Assert.Equal(clientId, sentSnapshot.ClientId);
-        Assert.Equal(0, sentSnapshot.Snapshot.Tick);
+        Assert.Equal(new Tick(0), sentSnapshot.Snapshot.Tick);
     }
 
     /*
@@ -372,8 +372,8 @@ public class NetworkServerTests
         server.Tick();
 
         Assert.Equal(2, transport.SentSnapshots.Count);
-        Assert.Equal(0, transport.SentSnapshots[0].Snapshot.Tick);
-        Assert.Equal(1, transport.SentSnapshots[1].Snapshot.Tick);
+        Assert.Equal(new Tick(0), transport.SentSnapshots[0].Snapshot.Tick);
+        Assert.Equal(new Tick(1), transport.SentSnapshots[1].Snapshot.Tick);
     }
 
     /*
@@ -592,6 +592,8 @@ public class NetworkServerTests
         public EntityId Id { get; } = new(0);
 
         public EntityState CaptureState() => State;
+
+        public CollisionRigSnapshot GetCollisionRig() => new();
     }
 
     private sealed class FakeServerSnapshotTransport : IServerSnapshotTransport

@@ -37,7 +37,7 @@ public class PlayerControllerSerializerTests
         var deserialized = PlayerControllerSerializer.Deserialize(bytes);
 
         Assert.Equal(new ClientId(3), deserialized.PlayerId);
-        Assert.Equal(12, deserialized.Tick);
+        Assert.Equal(new Tick(12), deserialized.Tick);
         Assert.Equal(5, deserialized.Actions.Count);
         Assert.Equal(1, deserialized.GetActionStrength("right"));
         Assert.Equal(1, deserialized.GetActionStrength("forward"));
@@ -127,7 +127,7 @@ public class PlayerControllerSerializerTests
         var command = controller.ToCommandPacket();
 
         Assert.Equal(new ClientId(3), command.ClientId);
-        Assert.Equal(12, command.Tick);
+        Assert.Equal(new Tick(12), command.Tick);
         Assert.Equal(ClientCommandKind.Controller, command.Kind);
         Assert.Equal(1, command.Controller.GetActionStrength("right"));
         Assert.Equal(1, command.Controller.GetActionStrength("forward"));

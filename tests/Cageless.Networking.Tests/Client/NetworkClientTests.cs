@@ -63,7 +63,7 @@ public class NetworkClientTests
         Assert.Equal(ClientPacketKind.Controller, ReadKind(transport.Sent[1]));
         Assert.Equal(ControllerPacketKind.Delta, command.ControllerPacketKind);
         Assert.Equal(new ClientId(3), command.ClientId);
-        Assert.Equal(1, command.Tick);
+        Assert.Equal(new Tick(1), command.Tick);
         Assert.Equal(1, command.Controller.GetActionStrength("forward"));
         Assert.True(command.HasLookRotation);
         Assert.Equal(1.25f, command.Controller.LookYaw);
@@ -95,7 +95,7 @@ public class NetworkClientTests
         Assert.Single(transport.Sent);
 
         Assert.Equal(1, client.Tick(0.001));
-        Assert.Equal(1, ReadCommand(transport.Sent[1]).Tick);
+        Assert.Equal(new Tick(1), ReadCommand(transport.Sent[1]).Tick);
     }
 
     /*
@@ -124,7 +124,7 @@ public class NetworkClientTests
 
         Assert.Single(transport.Sent);
         Assert.Equal(1, client.ProcessPendingTicks());
-        Assert.Equal(1, ReadCommand(transport.Sent[1]).Tick);
+        Assert.Equal(new Tick(1), ReadCommand(transport.Sent[1]).Tick);
     }
 
     /*
@@ -152,9 +152,9 @@ public class NetworkClientTests
         client.Controller.SetActionStrength("forward", 1);
         advancer.Advance(0.05);
 
-        Assert.Equal(4, clock.CurrentTick);
+        Assert.Equal(new Tick(4), clock.CurrentTick);
         Assert.Equal(1, client.ProcessPendingTicks());
-        Assert.Equal(4, ReadCommand(transport.Sent[1]).Tick);
+        Assert.Equal(new Tick(4), ReadCommand(transport.Sent[1]).Tick);
     }
 
     /*
@@ -185,7 +185,7 @@ public class NetworkClientTests
 
         Assert.Equal(1, client.Tick(0.05));
         var command = ReadCommand(transport.Sent[1]);
-        Assert.Equal(5, command.Tick);
+        Assert.Equal(new Tick(5), command.Tick);
         Assert.Equal(ControllerPacketKind.Full, command.ControllerPacketKind);
     }
 
@@ -262,7 +262,7 @@ public class NetworkClientTests
         Assert.Equal(1, received);
         Assert.True(client.TryGetLatestSnapshot(out var latest));
         Assert.Equal(SnapshotPacketKind.Full, latest.Kind);
-        Assert.Equal(12, latest.Frame.Tick);
+        Assert.Equal(new Tick(12), latest.Frame.Tick);
         Assert.Equal(new Vector3(1, 2, 3), latest.Frame.States[4].Position);
     }
 
@@ -298,7 +298,7 @@ public class NetworkClientTests
 
         Assert.Equal(1, received);
         Assert.True(client.TryGetLatestSnapshot(out var latest));
-        Assert.Equal(3, latest.Frame.Tick);
+        Assert.Equal(new Tick(3), latest.Frame.Tick);
     }
 
     /*

@@ -79,5 +79,7 @@ public class EntityRegistryTests
         public EntityId Id { get; } = new(0);
 
         public EntityState CaptureState() => new();
+
+        public CollisionRigSnapshot GetCollisionRig() => new();
     }
 }

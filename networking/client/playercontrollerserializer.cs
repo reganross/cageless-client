@@ -14,7 +14,7 @@ public static class PlayerControllerSerializer
         using var writer = new BinaryWriter(stream);
 
         writer.Write(controller.PlayerId.Value);
-        writer.Write(controller.Tick);
+        writer.Write(controller.Tick.Value);
         writer.Write(controller.LookYaw);
         writer.Write(controller.LookPitch);
         writer.Write(controller.Actions.Count);
@@ -36,7 +36,7 @@ public static class PlayerControllerSerializer
             using var reader = new BinaryReader(stream);
 
             var playerId = new ClientId(reader.ReadInt32());
-            int tick = reader.ReadInt32();
+            var tick = new Tick(reader.ReadInt32());
             float lookYaw = reader.ReadSingle();
             float lookPitch = reader.ReadSingle();
             int actionCount = reader.ReadInt32();

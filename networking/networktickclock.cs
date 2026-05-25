@@ -18,7 +18,7 @@ public class NetworkTickClock
         this.tickIntervalSeconds = tickIntervalSeconds;
     }
 
-    public int CurrentTick { get; private set; }
+    public Tick CurrentTick { get; private set; }
     public int PendingTicks { get; private set; }
 
     public Advancer CreateAdvancer()
@@ -37,15 +37,15 @@ public class NetworkTickClock
         return new TickCursor(this);
     }
 
-    public bool TryRequestTick(out int tick)
+    public bool TryRequestTick(out Tick tick)
     {
         if (PendingTicks == 0)
         {
-            tick = 0;
+            tick = new Tick(0);
             return false;
         }
 
-        tick = CurrentTick - PendingTicks + 1;
+        tick = CurrentTick - new Tick(PendingTicks) + new Tick(1);
         PendingTicks--;
         return true;
     }
@@ -53,7 +53,7 @@ public class NetworkTickClock
     public void Reset()
     {
         accumulatedSeconds = 0;
-        CurrentTick = 0;
+        CurrentTick = new Tick(0);
         PendingTicks = 0;
     }
 
@@ -88,7 +88,7 @@ public class NetworkTickClock
             this.clock = clock;
         }
 
-        public int CurrentTick
+        public Tick CurrentTick
         {
             get
             {
@@ -126,7 +126,7 @@ public class NetworkTickClock
     public sealed class TickCursor
     {
         private readonly NetworkTickClock clock;
-        private int lastRequestedTick;
+        private Tick lastRequestedTick;
 
         internal TickCursor(NetworkTickClock clock)
         {
@@ -134,11 +134,11 @@ public class NetworkTickClock
             lastRequestedTick = clock.CurrentTick;
         }
 
-        public bool TryRequestTick(out int tick)
+        public bool TryRequestTick(out Tick tick)
         {
             if (lastRequestedTick >= clock.CurrentTick)
             {
-                tick = 0;
+                tick = new Tick(0);
                 return false;
             }
 

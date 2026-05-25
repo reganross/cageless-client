@@ -1,0 +1,26 @@
+---
+description: Test authoring and modification rules
+globs: tests/**/*.cs
+alwaysApply: false
+---
+
+# Test Authoring
+
+Before writing production code for a new behavior, write the relevant test cases first.
+
+Use the networking test comment pattern above each `[Fact]` or test group:
+
+```csharp
+/*
+ PURPOSE:
+ Explain what behavior this protects.
+
+ DESIGN RULE:
+ - List the project rule or invariant the test enforces
+
+ FAILURE MEANS:
+ - Explain the gameplay, networking, or correctness risk
+*/
+```
+
+Do not modify existing test cases unless the user explicitly gives permission. If production changes require test updates, ask first and explain which tests need to change and why.

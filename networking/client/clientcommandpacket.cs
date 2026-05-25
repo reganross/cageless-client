@@ -13,7 +13,7 @@ public readonly struct ClientCommandPacket
     }
 
     public ClientId ClientId => Controller.PlayerId;
-    public int Tick => Controller.Tick;
+    public Tick Tick => Controller.Tick;
     public ClientCommandKind Kind { get; }
     public ControllerPacketKind ControllerPacketKind { get; }
     public bool HasLookRotation { get; }

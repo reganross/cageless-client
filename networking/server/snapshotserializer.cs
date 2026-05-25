@@ -47,7 +47,7 @@ public static class SnapshotSerializer
 
     private static void WriteFrame(BinaryWriter writer, SnapshotFrame frame)
     {
-        writer.Write(frame.Tick);
+        writer.Write((long)frame.Tick.Value);
         writer.Write(frame.States?.Count ?? 0);
 
         if (frame.States == null)
@@ -55,11 +55,11 @@ public static class SnapshotSerializer
             return;
         }
 
-        foreach (KeyValuePair<int, EntityState> kv in frame.States)
+        foreach (var kv in frame.States)
         {
             var state = kv.Value;
 
-            writer.Write(kv.Key);
+            writer.Write((int)kv.Key);
             writer.Write(state.TypeId);
             writer.Write(state.OwnerId);
             writer.Write(state.Position.X);
@@ -95,8 +95,8 @@ public static class SnapshotSerializer
     {
         var frame = new SnapshotFrame
         {
-            Tick = reader.ReadInt64(),
-            States = new Dictionary<int, EntityState>()
+            Tick = new Tick((int)reader.ReadInt64()),
+            States = new()
         };
 
         int stateCount = reader.ReadInt32();
